@@ -4,28 +4,32 @@ import type { Usuario } from '@nv/shared/types';
 import { SESSION_EXPIRED_EVENT } from './adminApi';
 import { Login } from './Login';
 import { Dashboard } from './Dashboard';
-import { DefinirSenha } from './DefinirSenha';
+import { DefinirSenha, type ModoSenha } from './DefinirSenha';
 import './painel.css';
 
 type Estado =
   | { fase: 'verificando' }
-  | { fase: 'convite'; token: string }
+  | { fase: 'senha'; token: string; modo: ModoSenha }
   | { fase: 'anonimo'; aviso?: string }
   | { fase: 'logado'; usuario: Usuario };
 
-// Invite link from the e-mail: /painel#definir-senha=TOKEN (the token never goes to server logs).
-const tokenDoConvite = () => window.location.hash.match(/^#definir-senha=([A-Za-z0-9_-]{20,100})$/)?.[1] ?? null;
+// Links from the e-mails (the token stays in the hash, so it never reaches server logs):
+//   /painel#definir-senha=TOKEN    invite      /painel#redefinir-senha=TOKEN    password recovery
+function linkDeSenha(): { token: string; modo: ModoSenha } | null {
+  const m = window.location.hash.match(/^#(definir|redefinir)-senha=([A-Za-z0-9_-]{20,100})$/);
+  return m ? { token: m[2], modo: m[1] === 'definir' ? 'convite' : 'recuperacao' } : null;
+}
 const limparHash = () => history.replaceState(null, '', window.location.pathname + window.location.search);
 
 export default function Painel() {
   const [estado, setEstado] = useState<Estado>(() => {
-    const token = tokenDoConvite();
-    return token ? { fase: 'convite', token } : { fase: 'verificando' };
+    const link = linkDeSenha();
+    return link ? { fase: 'senha', ...link } : { fase: 'verificando' };
   });
 
   useEffect(() => {
     document.title = 'Painel dos noivos · Nayara & Victor';
-    if (tokenDoConvite()) return;
+    if (linkDeSenha()) return;
     api<{ usuario: Usuario }>('/auth/me')
       .then(({ usuario }) => setEstado({ fase: 'logado', usuario }))
       .catch(() => setEstado({ fase: 'anonimo' }));
@@ -41,10 +45,11 @@ export default function Painel() {
   }, []);
 
   if (estado.fase === 'verificando') return <div className="painel-loading">Carregando…</div>;
-  if (estado.fase === 'convite') {
+  if (estado.fase === 'senha') {
     return (
       <DefinirSenha
         token={estado.token}
+        modo={estado.modo}
         onEntrar={(usuario) => {
           limparHash();
           setEstado({ fase: 'logado', usuario });

@@ -26,6 +26,7 @@ export const config = {
   // Panel owner (the only one who manages users): the account created from ADMIN_EMAIL.
   ownerEmail: (env.ADMIN_EMAIL ?? '').trim().toLowerCase(),
   inviteDays: 7,
+  resetMinutes: 60,
   // Public address of the site, used for Stripe's return URLs
   siteUrl: (env.SITE_URL ?? 'http://localhost:4000').replace(/\/$/, ''),
   stripeSecretKey: env.STRIPE_SECRET_KEY ?? '',

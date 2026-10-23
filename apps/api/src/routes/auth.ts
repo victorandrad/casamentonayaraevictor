@@ -11,10 +11,13 @@ import {
   verifyPassword,
 } from '../auth.ts';
 import { queryOne } from '../db.ts';
-import { aceitarConvite, ErroUsuario, lerConvite, SENHA_MINIMA } from '../usuarios.ts';
+import { aceitarConvite, ErroUsuario, lerConvite, lerRecuperacao, redefinirSenha, SENHA_MINIMA, solicitarRecuperacao } from '../usuarios.ts';
 
 const loginLimiter = rateLimiter(5, 15 * 60_000);
 const conviteLimiter = rateLimiter(20, 15 * 60_000);
+// Recovery e-mails: a few per address and per IP, so the form can't be used to flood an inbox.
+const recuperarPorEmail = rateLimiter(3, 60 * 60_000);
+const recuperarPorIp = rateLimiter(10, 60 * 60_000);
 const tokenParams = {
   type: 'object',
   required: ['token'],
@@ -95,6 +98,68 @@ export async function authRoutes(app: FastifyInstance) {
       if (conviteLimiter.hit(req.ip)) return reply.code(429).send({ erro: 'Muitas tentativas. Aguarde alguns minutos.' });
       try {
         const { usuario, sessao } = await aceitarConvite(req.params.token, req.body.senha);
+        reply.setCookie(SESSION_COOKIE, sessao.token, sessionCookieOptions(sessao.expiresAt));
+        return { usuario };
+      } catch (error) {
+        if (error instanceof ErroUsuario) return reply.code(error.status).send({ erro: error.message });
+        throw error;
+      }
+    },
+  );
+
+  // "Esqueci minha senha": always the same answer, whether or not the e-mail has an account.
+  app.post<{ Body: { email: string } }>(
+    '/recuperar-senha',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['email'],
+          additionalProperties: false,
+          properties: { email: { type: 'string', minLength: 3, maxLength: 200 } },
+        },
+      },
+    },
+    async (req, reply) => {
+      const email = req.body.email.trim().toLowerCase();
+      if (recuperarPorIp.hit(req.ip)) {
+        return reply.code(429).send({ erro: 'Muitos pedidos. Aguarde um pouco e tente de novo.' });
+      }
+      // Not awaited: the response time is the same whether or not the account exists.
+      if (!recuperarPorEmail.hit(email)) {
+        solicitarRecuperacao(email).catch((error) => req.log.error(error, 'falha na recuperação de senha'));
+      }
+      return { enviado: true };
+    },
+  );
+
+  app.get<{ Params: { token: string } }>('/redefinir/:token', { schema: { params: tokenParams } }, async (req, reply) => {
+    if (conviteLimiter.hit(req.ip)) return reply.code(429).send({ erro: 'Muitas tentativas. Aguarde alguns minutos.' });
+    try {
+      return await lerRecuperacao(req.params.token);
+    } catch (error) {
+      if (error instanceof ErroUsuario) return reply.code(error.status).send({ erro: error.message });
+      throw error;
+    }
+  });
+
+  app.post<{ Params: { token: string }; Body: { senha: string } }>(
+    '/redefinir/:token',
+    {
+      schema: {
+        params: tokenParams,
+        body: {
+          type: 'object',
+          required: ['senha'],
+          additionalProperties: false,
+          properties: { senha: { type: 'string', minLength: SENHA_MINIMA, maxLength: 200 } },
+        },
+      },
+    },
+    async (req, reply) => {
+      if (conviteLimiter.hit(req.ip)) return reply.code(429).send({ erro: 'Muitas tentativas. Aguarde alguns minutos.' });
+      try {
+        const { usuario, sessao } = await redefinirSenha(req.params.token, req.body.senha);
         reply.setCookie(SESSION_COOKIE, sessao.token, sessionCookieOptions(sessao.expiresAt));
         return { usuario };
       } catch (error) {

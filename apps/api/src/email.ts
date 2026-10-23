@@ -201,3 +201,76 @@ export async function enviarConviteUsuario(c: EmailConvite) {
     html,
   });
 }
+
+export type EmailRecuperacao = { nome: string; email: string; link: string; validadeMinutos: number };
+
+// "Forgot my password": link to create a new one.
+export async function enviarRecuperacaoSenha(r: EmailRecuperacao) {
+  const casal = `${casamento.noiva} & ${casamento.noivo}`;
+  const primeiroNome = r.nome.split(' ')[0];
+  const validade = r.validadeMinutos >= 60 ? `${Math.round(r.validadeMinutos / 60)} hora${r.validadeMinutos >= 120 ? 's' : ''}` : `${r.validadeMinutos} minutos`;
+
+  const html = `<!doctype html>
+<html lang="pt-BR">
+<body style="margin:0;padding:0;background:#f6f1ea;">
+  <div style="display:none;max-height:0;overflow:hidden;color:#f6f1ea;">Link para criar uma nova senha do painel do casamento. Vale por ${validade}.</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f1ea;padding:32px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fbf8f3;border:1px solid #e6dccd;border-radius:24px;overflow:hidden;">
+        <tr><td align="center" style="background:#f2e1dc;padding:34px 28px 30px;font-family:Georgia,'Times New Roman',serif;">
+          <div style="font-size:13px;letter-spacing:5px;text-transform:uppercase;color:#a86b64;font-family:Arial,Helvetica,sans-serif;">Painel dos noivos</div>
+          <div style="margin:12px 0 0;font-size:34px;font-style:italic;color:#43382f;">${escapar(casamento.noiva)} <span style="color:#c58a83;">&amp;</span> ${escapar(casamento.noivo)}</div>
+        </td></tr>
+        <tr><td align="center" style="padding:34px 36px 6px;font-family:Georgia,'Times New Roman',serif;">
+          <h1 style="margin:0 0 12px;font-weight:normal;font-style:italic;font-size:27px;color:#43382f;">Vamos criar uma nova senha, ${escapar(primeiroNome)}?</h1>
+          <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.7;color:#6b5e52;">
+            Recebemos um pedido para recuperar a senha do painel de <strong style="color:#43382f;">${escapar(r.email)}</strong>.
+            Toque no botão abaixo para escolher uma nova.
+          </p>
+        </td></tr>
+        <tr><td align="center" style="padding:28px 36px 8px;">
+          <a href="${r.link}" style="display:inline-block;background:#c58a83;color:#ffffff;text-decoration:none;font-family:Arial,Helvetica,sans-serif;font-size:14px;letter-spacing:3px;text-transform:uppercase;padding:16px 34px;border-radius:999px;">Criar nova senha</a>
+          <p style="margin:14px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#a88f7e;">O link vale por ${validade} e só pode ser usado uma vez.</p>
+        </td></tr>
+        <tr><td style="padding:24px 36px 0;">
+          <div style="background:#f8eeea;border-radius:16px;padding:16px 20px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#6b5e52;">
+            <strong style="color:#8f544e;">Não pediu?</strong> É só ignorar este e-mail: sua senha continua a mesma.
+            Ao criar a nova senha, todos os aparelhos conectados saem do painel.
+          </div>
+        </td></tr>
+        <tr><td style="padding:22px 36px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.7;color:#a88f7e;">
+          Se o botão não funcionar, copie e cole este endereço no navegador:<br>
+          <a href="${r.link}" style="color:#a86b64;word-break:break-all;">${r.link}</a>
+        </td></tr>
+        <tr><td align="center" style="padding:26px 36px 32px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.7;color:#a88f7e;">
+          Com carinho, ${escapar(casal)}<br>
+          Este é um e-mail automático; respostas não são lidas.
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const texto = [
+    `Olá, ${primeiroNome}!`,
+    '',
+    `Recebemos um pedido para recuperar a senha do painel de ${r.email}.`,
+    'Crie uma nova senha neste link:',
+    r.link,
+    '',
+    `O link vale por ${validade} e só pode ser usado uma vez.`,
+    'Não pediu? Ignore este e-mail: sua senha continua a mesma.',
+    '',
+    `Com carinho, ${casal}`,
+  ].join('\n');
+
+  await transporte.sendMail({
+    from: config.smtp.from,
+    replyTo: config.smtp.replyTo || undefined,
+    to: { name: r.nome, address: r.email },
+    subject: `Recuperar sua senha do painel · ${casal}`,
+    text: texto,
+    html,
+  });
+}

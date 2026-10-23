@@ -704,3 +704,7 @@
 .conta-usuarios .painel-section-head { margin-bottom: 12px; }
 .conta-link { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 .conta-link code { flex: 1; min-width: 0; padding: 6px 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.7); font-size: 12px; overflow-wrap: anywhere; }
+
+/* Login: "Esqueci minha senha" */
+.painel-login__esqueci { display: block; margin: 14px auto 0; background: none; border: 0; padding: 4px; font: inherit; font-size: 14px; color: var(--nv-rose-link); cursor: pointer; }
+.painel-login__esqueci:hover { color: var(--nv-rose-deep); text-decoration: underline; }
