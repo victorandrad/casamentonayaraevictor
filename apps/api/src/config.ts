@@ -1,0 +1,42 @@
+// Runtime configuration from environment variables.
+import { join } from 'node:path';
+
+const env = process.env;
+
+function databaseUrl(): string {
+  if (env.DATABASE_URL) return env.DATABASE_URL;
+  // Running on the host against the Docker database (npm run dev -w @nv/api).
+  const user = env.POSTGRES_USER ?? 'casamento';
+  const db = env.POSTGRES_DB ?? 'casamento';
+  const port = env.POSTGRES_PORT ?? '5433';
+  if (!env.POSTGRES_PASSWORD) throw new Error('Defina DATABASE_URL ou POSTGRES_PASSWORD');
+  return `postgres://${user}:${encodeURIComponent(env.POSTGRES_PASSWORD)}@localhost:${port}/${db}`;
+}
+
+export const config = {
+  port: Number(env.PORT ?? env.API_PORT ?? 4100),
+  isProduction: env.NODE_ENV === 'production',
+  databaseUrl: databaseUrl(),
+  allowedOrigins: (env.ALLOWED_ORIGINS ?? 'http://localhost:4000')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean),
+  cookieSecure: env.COOKIE_SECURE === 'true',
+  sessionDays: 30,
+  // Public address of the site, used for Stripe's return URLs
+  siteUrl: (env.SITE_URL ?? 'http://localhost:4000').replace(/\/$/, ''),
+  stripeSecretKey: env.STRIPE_SECRET_KEY ?? '',
+  stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET ?? '',
+  // Uploaded gift photos (a Docker volume in production)
+  uploadsDir: env.UPLOADS_DIR ?? join(import.meta.dirname, '..', 'uploads'),
+  // Receipt e-mails over SMTP (local Mailpit by default)
+  smtp: {
+    host: env.SMTP_HOST ?? 'localhost',
+    port: Number(env.SMTP_PORT ?? 1025),
+    secure: env.SMTP_SECURE === 'true',
+    user: env.SMTP_USER ?? '',
+    pass: env.SMTP_PASS ?? '',
+    from: env.EMAIL_FROM ?? 'Nayara & Victor <presentes@nayaraevictor.local>',
+    replyTo: env.EMAIL_REPLY_TO ?? '',
+  },
+};

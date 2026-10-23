@@ -1,0 +1,20 @@
+{
+  "name": "@nv/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./theme.css": "./src/theme.css",
+    "./federation": "./federation.ts",
+    "./remote-config": "./remote-config.ts",
+    "./types": "./src/types.ts",
+    "./api": "./src/api.ts",
+    "./taxas": "./src/taxas.ts",
+    "./config": "./src/config.ts",
+    "./categorias": "./src/categorias.ts"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
+}

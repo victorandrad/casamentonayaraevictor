@@ -1,0 +1,27 @@
+{
+  "name": "@nv/rsvp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "rsbuild dev",
+    "build": "rsbuild build",
+    "preview": "rsbuild preview",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@nv/shared": "*",
+    "html5-qrcode": "^2.3.8",
+    "qrcode-generator": "^2.0.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@module-federation/rsbuild-plugin": "^2.9.2",
+    "@rsbuild/core": "^2.2.14",
+    "@rsbuild/plugin-react": "^2.1.1",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "typescript": "^5.9.0"
+  }
+}

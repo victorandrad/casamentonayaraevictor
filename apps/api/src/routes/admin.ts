@@ -1,0 +1,305 @@
+import type { FastifyInstance, FastifyReply } from 'fastify';
+import { ICONES_CATEGORIA } from '@nv/shared/categorias';
+import type { CategoriaInput, Configuracoes, ConvidadoInput, OrganizacaoLista, PresenteInput } from '@nv/shared/types';
+import { requireAuth } from '../auth.ts';
+import * as repo from '../repo.ts';
+import { enviarReciboDoPedido, listarPedidos } from '../pedidos.ts';
+import { ImagemInvalida, removerImagem, salvarImagem, TIPOS_ACEITOS } from '../uploads.ts';
+
+const idParams = {
+  type: 'object',
+  required: ['id'],
+  properties: { id: { type: 'integer', minimum: 1 } },
+} as const;
+
+const convidadoBody = {
+  type: 'object',
+  required: ['nome', 'limiteAcompanhantes'],
+  additionalProperties: false,
+  properties: {
+    nome: { type: 'string', minLength: 1, maxLength: 120 },
+    limiteAcompanhantes: { type: 'integer', minimum: 0, maximum: 10 },
+  },
+} as const;
+
+const presenteBody = {
+  type: 'object',
+  required: ['categoriaId', 'nome', 'valorCentavos', 'quantidadeMaxima'],
+  additionalProperties: false,
+  properties: {
+    categoriaId: { type: 'integer', minimum: 1 },
+    nome: { type: 'string', minLength: 1, maxLength: 120 },
+    valorCentavos: { type: 'integer', minimum: 0, maximum: 100_000_000 },
+    // An uploaded photo (/api/uploads/<hex>.webp) or an external https link
+    fotoUrl: { type: ['string', 'null'], maxLength: 1000, pattern: '^(https?://.*|/api/uploads/[a-f0-9]{32}\\.webp)?$' },
+    quantidadeMaxima: { type: ['integer', 'null'], minimum: 1, maximum: 1000 },
+  },
+} as const;
+
+const categoriaBody = {
+  type: 'object',
+  required: ['nome', 'icone'],
+  additionalProperties: false,
+  properties: {
+    nome: { type: 'string', minLength: 1, maxLength: 60 },
+    icone: { enum: [...ICONES_CATEGORIA] },
+  },
+} as const;
+
+const notFound = { erro: 'Item não encontrado.' };
+
+export async function adminRoutes(app: FastifyInstance) {
+  app.addHook('preHandler', requireAuth);
+
+  app.get('/resumo', async () => repo.resumo());
+
+  // Convidados
+  app.get('/convidados', async () => repo.listConvidados());
+
+  app.post<{ Body: ConvidadoInput }>('/convidados', { schema: { body: convidadoBody } }, async (req, reply) => {
+    const nome = req.body.nome.trim();
+    if (!nome) return reply.code(400).send({ erro: 'Informe o nome do convidado.' });
+    return reply.code(201).send(await repo.createConvidado({ ...req.body, nome }));
+  });
+
+  app.put<{ Params: { id: number }; Body: ConvidadoInput }>(
+    '/convidados/:id',
+    { schema: { params: idParams, body: convidadoBody } },
+    async (req, reply) => {
+      const nome = req.body.nome.trim();
+      if (!nome) return reply.code(400).send({ erro: 'Informe o nome do convidado.' });
+      return (await repo.updateConvidado(req.params.id, { ...req.body, nome })) ?? reply.code(404).send(notFound);
+    },
+  );
+
+  app.delete<{ Params: { id: number } }>('/convidados/:id', { schema: { params: idParams } }, async (req, reply) =>
+    (await repo.deleteConvidado(req.params.id)) ? reply.code(204).send() : reply.code(404).send(notFound),
+  );
+
+  // Recados
+  app.get('/recados', async () => repo.listRecadosAdmin());
+
+  app.patch<{ Params: { id: number }; Body: { visivel: boolean } }>(
+    '/recados/:id',
+    {
+      schema: {
+        params: idParams,
+        body: { type: 'object', required: ['visivel'], additionalProperties: false, properties: { visivel: { type: 'boolean' } } },
+      },
+    },
+    async (req, reply) => (await repo.setRecadoVisivel(req.params.id, req.body.visivel)) ?? reply.code(404).send(notFound),
+  );
+
+  app.delete<{ Params: { id: number } }>('/recados/:id', { schema: { params: idParams } }, async (req, reply) =>
+    (await repo.deleteRecado(req.params.id)) ? reply.code(204).send() : reply.code(404).send(notFound),
+  );
+
+  // Photo upload for gifts (multipart, field "foto")
+  app.post('/uploads', async (req, reply) => {
+    const arquivo = await req.file();
+    if (!arquivo) return reply.code(400).send({ erro: 'Escolha uma imagem para enviar.' });
+    if (!TIPOS_ACEITOS.includes(arquivo.mimetype)) {
+      return reply.code(400).send({ erro: 'Formato não aceito. Envie JPG, PNG, WebP ou HEIC.' });
+    }
+    let conteudo: Buffer;
+    try {
+      conteudo = await arquivo.toBuffer();
+    } catch {
+      return reply.code(413).send({ erro: 'A imagem é muito grande. O limite é 10 MB.' });
+    }
+    try {
+      return reply.code(201).send({ url: await salvarImagem(conteudo) });
+    } catch (error) {
+      if (error instanceof ImagemInvalida) return reply.code(400).send({ erro: error.message });
+      throw error;
+    }
+  });
+
+  // Categorias da lista de presentes
+  app.get('/categorias', async () => repo.listCategorias());
+
+  const salvarCategoria = async (reply: FastifyReply, fn: () => Promise<unknown>) => {
+    try {
+      return await fn();
+    } catch (error) {
+      if (error instanceof repo.NomeDuplicado) return reply.code(409).send({ erro: error.message });
+      throw error;
+    }
+  };
+
+  app.post<{ Body: CategoriaInput }>('/categorias', { schema: { body: categoriaBody } }, async (req, reply) => {
+    const nome = req.body.nome.trim();
+    if (!nome) return reply.code(400).send({ erro: 'Informe o nome da categoria.' });
+    return salvarCategoria(reply, async () => reply.code(201).send(await repo.createCategoria({ ...req.body, nome })));
+  });
+
+  app.put<{ Params: { id: number }; Body: CategoriaInput }>(
+    '/categorias/:id',
+    { schema: { params: idParams, body: categoriaBody } },
+    async (req, reply) => {
+      const nome = req.body.nome.trim();
+      if (!nome) return reply.code(400).send({ erro: 'Informe o nome da categoria.' });
+      return salvarCategoria(
+        reply,
+        async () => (await repo.updateCategoria(req.params.id, { ...req.body, nome })) ?? reply.code(404).send(notFound),
+      );
+    },
+  );
+
+  app.put<{ Body: { ids: number[] } }>(
+    '/categorias/ordem',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['ids'],
+          additionalProperties: false,
+          properties: { ids: { type: 'array', maxItems: 200, uniqueItems: true, items: { type: 'integer', minimum: 1 } } },
+        },
+      },
+    },
+    async (req) => repo.ordenarCategorias(req.body.ids),
+  );
+
+  // Drag-and-drop layout of the whole list (category order + gifts in each).
+  app.put<{ Body: { categorias: OrganizacaoLista } }>(
+    '/presentes/organizacao',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['categorias'],
+          additionalProperties: false,
+          properties: {
+            categorias: {
+              type: 'array',
+              maxItems: 200,
+              items: {
+                type: 'object',
+                required: ['id', 'presentes'],
+                additionalProperties: false,
+                properties: {
+                  id: { type: 'integer', minimum: 1 },
+                  presentes: { type: 'array', maxItems: 2000, items: { type: 'integer', minimum: 1 } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { categorias } = req.body;
+      const presentes = categorias.flatMap((c) => c.presentes);
+      if (new Set(categorias.map((c) => c.id)).size !== categorias.length || new Set(presentes).size !== presentes.length) {
+        return reply.code(400).send({ erro: 'Organização inválida.' });
+      }
+      if (!(await repo.organizarLista(categorias))) {
+        return reply.code(409).send({ erro: 'A lista mudou enquanto vocês organizavam. Recarregue a página.' });
+      }
+      return { categorias: await repo.listCategorias(), presentes: await repo.listPresentes() };
+    },
+  );
+
+  // ?moverPara=<id> moves the category's gifts there before deleting it.
+  app.delete<{ Params: { id: number }; Querystring: { moverPara?: number } }>(
+    '/categorias/:id',
+    {
+      schema: {
+        params: idParams,
+        querystring: { type: 'object', additionalProperties: false, properties: { moverPara: { type: 'integer', minimum: 1 } } },
+      },
+    },
+    async (req, reply) => {
+      const resultado = await repo.deleteCategoria(req.params.id, req.query.moverPara);
+      if (resultado === 'nao_encontrada') return reply.code(404).send(notFound);
+      if (resultado === 'tem_presentes') return reply.code(409).send({ erro: 'Escolha para qual categoria mover os presentes desta.' });
+      if (resultado === 'destino_invalido') return reply.code(400).send({ erro: 'Categoria de destino inválida.' });
+      return reply.code(204).send();
+    },
+  );
+
+  // Presentes
+  app.get('/presentes', async () => repo.listPresentes());
+
+  const categoriaInvalida = { erro: 'Escolha uma categoria válida.' };
+
+  app.post<{ Body: PresenteInput }>('/presentes', { schema: { body: presenteBody } }, async (req, reply) => {
+    const nome = req.body.nome.trim();
+    if (!nome) return reply.code(400).send({ erro: 'Informe o nome do presente.' });
+    if (!(await repo.categoriaExiste(req.body.categoriaId))) return reply.code(400).send(categoriaInvalida);
+    return reply.code(201).send(
+      await repo.createPresente({ ...req.body, nome, fotoUrl: req.body.fotoUrl ?? null, quantidadeMaxima: req.body.quantidadeMaxima ?? null }),
+    );
+  });
+
+  app.put<{ Params: { id: number }; Body: PresenteInput }>(
+    '/presentes/:id',
+    { schema: { params: idParams, body: presenteBody } },
+    async (req, reply) => {
+      const nome = req.body.nome.trim();
+      if (!nome) return reply.code(400).send({ erro: 'Informe o nome do presente.' });
+      if (!(await repo.categoriaExiste(req.body.categoriaId))) return reply.code(400).send(categoriaInvalida);
+      const anterior = (await repo.listPresentes()).find((p) => p.id === req.params.id);
+      const atualizado = await repo.updatePresente(req.params.id, {
+        ...req.body,
+        nome,
+        fotoUrl: req.body.fotoUrl ?? null,
+        quantidadeMaxima: req.body.quantidadeMaxima ?? null,
+      });
+      if (!atualizado) return reply.code(404).send(notFound);
+      if (anterior?.fotoUrl !== atualizado.fotoUrl) await removerImagem(anterior?.fotoUrl);
+      return atualizado;
+    },
+  );
+
+  app.delete<{ Params: { id: number } }>('/presentes/:id', { schema: { params: idParams } }, async (req, reply) => {
+    const anterior = (await repo.listPresentes()).find((p) => p.id === req.params.id);
+    if (!(await repo.deletePresente(req.params.id))) return reply.code(404).send(notFound);
+    await removerImagem(anterior?.fotoUrl);
+    return reply.code(204).send();
+  });
+
+  // Presentes recebidos (pedidos do Stripe)
+  app.get('/pedidos', async () => listarPedidos());
+
+  app.post<{ Params: { id: number } }>('/pedidos/:id/recibo', { schema: { params: idParams } }, async (req, reply) =>
+    (await enviarReciboDoPedido(req.params.id, { reenviar: true }))
+      ? { enviado: true }
+      : reply.code(400).send({ erro: 'Não foi possível enviar o recibo. Confira se o pedido está pago e o servidor de e-mail.' }),
+  );
+
+  // Configurações
+  const lerConfiguracoes = async (): Promise<Configuracoes> => ({
+    taxa: await repo.getTaxa(),
+  });
+  app.get('/configuracoes', lerConfiguracoes);
+
+  app.put<{ Body: Configuracoes }>(
+    '/configuracoes',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['taxa'],
+          additionalProperties: false,
+          properties: {
+            taxa: {
+              type: 'object',
+              required: ['percentual', 'fixoCentavos'],
+              additionalProperties: false,
+              properties: {
+                percentual: { type: 'number', minimum: 0, maximum: 20 },
+                fixoCentavos: { type: 'integer', minimum: 0, maximum: 1000 },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (req): Promise<Configuracoes> => {
+      await repo.setTaxa(req.body.taxa);
+      return lerConfiguracoes();
+    },
+  );
+}

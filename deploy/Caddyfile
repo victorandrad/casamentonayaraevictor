@@ -1,0 +1,45 @@
+# Production web server: HTTPS (Let's Encrypt, automatic), the built
+# microfrontends and the API behind /api.
+#   /           shell (index.html for any route, e.g. /painel)
+#   /mf/<app>/  each remote (evento, rsvp, presentes, mural, painel)
+#   /api/*      API container
+{
+	email {$ACME_EMAIL}
+}
+
+www.{$SITE_DOMAIN} {
+	redir https://{$SITE_DOMAIN}{uri} permanent
+}
+
+{$SITE_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(self), microphone=(), geolocation=()"
+		-Server
+	}
+
+	handle /api/* {
+		reverse_proxy api:4100
+	}
+
+	# Hashed file names: cache for a year. Manifests and HTML: always revalidate.
+	@imutavel path /static/* /mf/*/static/*
+	header @imutavel Cache-Control "public, max-age=31536000, immutable"
+	@revalidar path / /index.html /mf/*/mf-manifest.json
+	header @revalidar Cache-Control "no-cache"
+
+	handle /mf/* {
+		root * /srv
+		file_server
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

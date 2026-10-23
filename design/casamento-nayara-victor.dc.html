@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Jost:wght@300;400;500&family=Pinyon+Script&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  a { color: #a86b64; text-decoration: none; }
+  a:hover { color: #8f544e; }
+  ::selection { background: #e3c4c0; }
+  @media (max-width: 720px) {
+    .nv-nav { justify-content: center !important; padding: 12px 18px !important; }
+    .nv-nav-links { display: none !important; }
+    .nv-section { padding-left: 18px !important; padding-right: 18px !important; }
+  }
+</style>
+</helmet>
+<div style="font-family: 'Jost', sans-serif; color: #43382f; background: #f6f1ea; -webkit-font-smoothing: antialiased; overflow-x: hidden;">
+
+  <nav class="nv-nav" style="position: fixed; top: 0; left: 0; right: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between; padding: 14px 28px; background: rgba(246,241,234,0.86); backdrop-filter: blur(10px); border-bottom: 1px solid #e6dccd;">
+    <a href="#convite" style="font-family: 'Libre Caslon Text', serif; font-size: 18px; letter-spacing: 2px; color: #43382f;">N <span style="color:#c58a83;">&amp;</span> V</a>
+    <div class="nv-nav-links" style="display: flex; gap: 26px; flex-wrap: wrap; justify-content: flex-end;">
+      <a href="#evento" style="font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #6b5e52;">Evento</a>
+      <a href="#presenca" style="font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #6b5e52;">Presença</a>
+      <a href="#presentes" style="font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #6b5e52;">Presentes</a>
+      <a href="#galeria" style="font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #6b5e52;">Galeria</a>
+      <a href="#recados" style="font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #6b5e52;">Recados</a>
+      <a href="#local" style="font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #6b5e52;">Local</a>
+    </div>
+  </nav>
+
+  <!-- HERO / CONVITE -->
+  <section id="convite" style="position: relative; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 120px 24px 80px;">
+    <sc-if value="{{ heroImagem }}" hint-placeholder-val="{{ true }}">
+      <div style="position: absolute; inset: 0; background: repeating-linear-gradient(45deg,#efe7db,#efe7db 14px,#e8dece 14px,#e8dece 28px); opacity: 0.5;"></div>
+      <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(246,241,234,0.55), rgba(246,241,234,0.9));"></div>
+    </sc-if>
+    <div style="position: relative; animation: fadeUp 1s ease both;">
+      <p style="font-size: 13px; letter-spacing: 5px; text-transform: uppercase; color: #a88f7e; margin: 0 0 18px;">Vamos nos casar</p>
+      <h1 style="font-family: {{ nomesFont }}; font-size: clamp(64px, 13vw, 168px); font-weight: 400; line-height: 0.95; margin: 0; color: #43382f;">Nayara <span style="color: #c58a83;">&amp;</span> Victor</h1>
+      <div style="display: flex; align-items: center; justify-content: center; gap: 22px; margin: 34px 0 8px;">
+        <span style="height: 1px; width: 60px; background: #cdbba9;"></span>
+        <p style="font-family: 'Libre Caslon Text', serif; font-size: 20px; letter-spacing: 3px; margin: 0; color: #6b5e52;">28 · 08 · 2027</p>
+        <span style="height: 1px; width: 60px; background: #cdbba9;"></span>
+      </div>
+      <p style="font-size: 15px; letter-spacing: 1px; color: #8c7d6f; margin: 4px 0 0;">Paróquia São José · Itu, SP</p>
+    </div>
+    <a href="#evento" style="position: relative; margin-top: 56px; font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: #a88f7e;">↓ Nosso grande dia</a>
+  </section>
+
+  <!-- CONTAGEM -->
+  <sc-if value="{{ mostrarContagem }}" hint-placeholder-val="{{ true }}">
+  <section style="background: #efe7db; padding: 70px 24px; text-align: center;">
+    <p style="font-family: 'Libre Caslon Text', serif; font-style: italic; font-size: 22px; color: #8f544e; margin: 0 0 34px;">Faltam</p>
+    <div style="display: flex; gap: 18px; justify-content: center; flex-wrap: wrap;">
+      <div style="min-width: 96px;">
+        <div style="font-family: 'Libre Caslon Text', serif; font-size: 56px; color: #43382f; line-height: 1;">{{ cd.d }}</div>
+        <div style="font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #a88f7e; margin-top: 8px;">Dias</div>
+      </div>
+      <div style="min-width: 96px;">
+        <div style="font-family: 'Libre Caslon Text', serif; font-size: 56px; color: #43382f; line-height: 1;">{{ cd.h }}</div>
+        <div style="font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #a88f7e; margin-top: 8px;">Horas</div>
+      </div>
+      <div style="min-width: 96px;">
+        <div style="font-family: 'Libre Caslon Text', serif; font-size: 56px; color: #43382f; line-height: 1;">{{ cd.m }}</div>
+        <div style="font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #a88f7e; margin-top: 8px;">Minutos</div>
+      </div>
+      <div style="min-width: 96px;">
+        <div style="font-family: 'Libre Caslon Text', serif; font-size: 56px; color: #c58a83; line-height: 1;">{{ cd.s }}</div>
+        <div style="font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #a88f7e; margin-top: 8px;">Segundos</div>
+      </div>
+    </div>
+  </section>
+  </sc-if>
+
+  <!-- EVENTO -->
+  <section id="evento" style="padding: 100px 24px; max-width: 1040px; margin: 0 auto;">
+    <div style="text-align: center; margin-bottom: 60px;">
+      <p style="font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: #a88f7e; margin: 0 0 12px;">O grande dia</p>
+      <h2 style="font-family: 'Libre Caslon Text', serif; font-size: clamp(34px,5vw,52px); font-weight: 400; margin: 0; color: #43382f;">Cerimônia &amp; Jantar</h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 28px;">
+      <div style="background: #fbf8f3; border: 1px solid #e6dccd; padding: 44px 36px; text-align: center;">
+        <div style="font-size: 30px; margin-bottom: 14px;">⛪</div>
+        <h3 style="font-family: 'Libre Caslon Text', serif; font-size: 26px; font-weight: 400; margin: 0 0 6px;">Cerimônia</h3>
+        <p style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: #c58a83; margin: 0 0 18px;">16h00</p>
+        <p style="font-size: 16px; line-height: 1.7; color: #6b5e52; margin: 0 0 18px;">Paróquia São José<br>R. Gagliano Micai, s/n · Vila Cleto<br>Itu · São Paulo</p>
+        <a href="https://www.google.com/maps/search/?api=1&query=Par%C3%B3quia+S%C3%A3o+Jos%C3%A9+R.+Gagliano+Micai+Vila+Cleto+Itu+SP+13310-282" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 7px; border: 1px solid #c58a83; color: #a86b64; padding: 10px 20px; font-size: 12px; letter-spacing: 2px; text-transform: uppercase;">📍 Abrir no Google Maps</a>
+      </div>
+      <div style="background: #fbf8f3; border: 1px solid #e6dccd; padding: 44px 36px; text-align: center;">
+        <div style="font-size: 30px; margin-bottom: 14px;">🍽️</div>
+        <h3 style="font-family: 'Libre Caslon Text', serif; font-size: 26px; font-weight: 400; margin: 0 0 6px;">Jantar</h3>
+        <p style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: #c58a83; margin: 0 0 18px;">Após a cerimônia</p>
+        <p style="font-size: 16px; line-height: 1.7; color: #6b5e52; margin: 0 0 18px;">Recanto Espelho da Lua<br>R. Domingos José da Cruz, 420<br>Jardim Itaguaçu · Salto, SP</p>
+        <a href="https://www.google.com/maps/search/?api=1&query=Recanto+Espelho+da+Lua+R.+Domingos+Jos%C3%A9+da+Cruz+420+Jardim+Itaguacu+Salto+SP+13323-231" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 7px; border: 1px solid #c58a83; color: #a86b64; padding: 10px 20px; font-size: 12px; letter-spacing: 2px; text-transform: uppercase;">📍 Abrir no Google Maps</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- RSVP -->
+  <section id="presenca" style="background: #efe7db; padding: 100px 24px;">
+    <div style="max-width: 640px; margin: 0 auto; text-align: center;">
+      <p style="font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: #a88f7e; margin: 0 0 12px;">Confirme sua presença</p>
+      <h2 style="font-family: 'Libre Caslon Text', serif; font-size: clamp(34px,5vw,52px); font-weight: 400; margin: 0 0 14px; color: #43382f;">RSVP</h2>
+      <p style="font-size: 16px; line-height: 1.7; color: #6b5e52; margin: 0 0 40px;">Sua confirmação nos ajuda muito na organização. Por favor, responda até <strong style="color:#8f544e;">01 de agosto de 2027</strong>.</p>
+
+      <sc-if value="{{ guestNome }}" hint-placeholder-val="{{ false }}">
+        <p style="font-family: 'Libre Caslon Text', serif; font-style: italic; font-size: 24px; color: #8f544e; margin: -18px 0 34px;">Olá, {{ guestNome }} 💐</p>
+      </sc-if>
+
+      <sc-if value="{{ pedirCodigo }}" hint-placeholder-val="{{ false }}">
+        <div style="background: #fbf8f3; border: 1px solid #e6dccd; padding: 40px 36px; text-align: left; margin-bottom: 8px;">
+          <p style="font-size: 15px; line-height: 1.7; color: #6b5e52; margin: 0 0 20px;">Cada convite tem um código único. Digite o código que você recebeu para confirmar sua presença.</p>
+          <label style="display: block; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #a88f7e; margin-bottom: 8px;">Código do convite</label>
+          <input value="{{ codigoInput }}" onChange="{{ onCodigo }}" placeholder="Ex: NV-A1B2" style="width: 100%; padding: 14px 16px; margin-bottom: 8px; border: 1px solid #d9c8b6; background: #fff; font-family: monospace; font-size: 16px; letter-spacing: 2px; color: #43382f; outline: none; text-transform: uppercase;">
+          <sc-if value="{{ codigoErro }}" hint-placeholder-val="{{ false }}">
+            <p style="font-size: 13px; color: #b3766f; margin: 0 0 8px;">Código não encontrado. Confira com os noivos.</p>
+          </sc-if>
+          <button onClick="{{ buscarCodigo }}" style="width: 100%; margin-top: 12px; background: #c58a83; border: none; color: #fff; padding: 15px; font-family: 'Jost',sans-serif; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer;">Buscar meu convite</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ rsvpDone }}" hint-placeholder-val="{{ false }}">
+        <div style="background: #fbf8f3; border: 1px solid #d9c8b6; padding: 48px 32px; animation: fadeUp .6s both;">
+          <div style="font-size: 34px; margin-bottom: 14px;">💌</div>
+          <h3 style="font-family: 'Libre Caslon Text', serif; font-size: 28px; font-weight: 400; margin: 0 0 10px;">Recebido, obrigado!</h3>
+          <p style="font-size: 16px; color: #6b5e52; margin: 0 0 26px;">Sua resposta foi registrada. Mal podemos esperar para celebrar com você.</p>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 0 0 28px;">
+            <p style="font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #a88f7e; margin: 0;">Seu convite digital</p>
+            <div ref="{{ qrRef }}" style="width: 180px; height: 180px; padding: 14px; background: #f6f1ea; border: 1px solid #ddd0be; display: flex; align-items: center; justify-content: center;"></div>
+            <p style="font-family: monospace; font-size: 15px; letter-spacing: 2px; color: #43382f; margin: 0;">{{ inviteCode }}</p>
+            <p style="font-size: 13px; line-height: 1.6; color: #8c7d6f; margin: 0; max-width: 290px;">Apresente este QR Code na entrada para validar sua presença. Salve uma captura de tela ou imprima.</p>
+          </div>
+          <button onClick="{{ resetRsvp }}" style="background: none; border: 1px solid #c9b8a6; color: #6b5e52; padding: 12px 26px; font-family: 'Jost',sans-serif; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer;">Editar resposta</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showRsvpForm }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #fbf8f3; border: 1px solid #e6dccd; padding: 44px 36px; text-align: left;">
+        <label style="display: block; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #a88f7e; margin-bottom: 8px;">Nome completo</label>
+        <input value="{{ rsvp.nome }}" onChange="{{ onNome }}" readOnly="{{ nomeTravado }}" placeholder="Seu nome" style="{{ nomeInputStyle }}">
+
+        <label style="display: block; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #a88f7e; margin-bottom: 10px;">Você vai comparecer?</label>
+        <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+          <button onClick="{{ setSim }}" style="{{ simStyle }}">Sim, estarei lá</button>
+          <button onClick="{{ setNao }}" style="{{ naoStyle }}">Não poderei ir</button>
+        </div>
+
+        <label style="display: block; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #a88f7e; margin-bottom: 8px;">Acompanhantes</label>
+        <select value="{{ rsvp.acomp }}" onChange="{{ onAcomp }}" style="width: 100%; padding: 14px 16px; margin-bottom: 24px; border: 1px solid #d9c8b6; background: #fff; font-family: 'Jost',sans-serif; font-size: 16px; color: #43382f; outline: none;">
+          <option value="0">Somente eu</option>
+          <option value="1">+1 acompanhante</option>
+          <option value="2">+2 acompanhantes</option>
+          <option value="3">+3 acompanhantes</option>
+          <option value="4">+4 acompanhantes</option>
+        </select>
+
+        <label style="display: block; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #a88f7e; margin-bottom: 8px;">Recado (opcional)</label>
+        <textarea value="{{ rsvp.msg }}" onChange="{{ onRsvpMsg }}" placeholder="Deixe uma mensagem carinhosa" rows="3" style="width: 100%; padding: 14px 16px; margin-bottom: 26px; border: 1px solid #d9c8b6; background: #fff; font-family: 'Jost',sans-serif; font-size: 16px; color: #43382f; outline: none; resize: vertical;"></textarea>
+
+        <button onClick="{{ submitRsvp }}" style="width: 100%; background: #c58a83; border: none; color: #fff; padding: 16px; font-family: 'Jost',sans-serif; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer;" style-hover="background: #b3766f;">Confirmar presença</button>
+      </div>
+      </sc-if>
+    </div>
+  </section>
+
+  <!-- PRESENTES -->
+  <section id="presentes" style="padding: 100px 24px; max-width: 1100px; margin: 0 auto;">
+    <div style="text-align: center; margin-bottom: 24px;">
+      <p style="font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: #a88f7e; margin: 0 0 12px;">Lista de presentes</p>
+      <h2 style="font-family: 'Libre Caslon Text', serif; font-size: clamp(34px,5vw,52px); font-weight: 400; margin: 0 0 14px; color: #43382f;">Nos ajude a começar</h2>
+      <p style="font-size: 16px; line-height: 1.7; color: #6b5e52; max-width: 620px; margin: 0 auto;">Sua presença é o nosso maior presente. Mas, se quiser nos presentear, escolha um item abaixo e contribua com o valor sugerido via Pix.</p>
+    </div>
+
+    <h3 style="font-family: 'Libre Caslon Text', serif; font-style: italic; font-size: 28px; font-weight: 400; text-align: center; color: #8f544e; margin: 56px 0 30px;">🍸 Chá-Bar</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 20px;">
+      <sc-for list="{{ chabar }}" as="item" hint-placeholder-count="4">
+        <div style="background: #fbf8f3; border: 1px solid #e6dccd; padding: 26px 24px; text-align: center; display: flex; flex-direction: column; gap: 14px;">
+          <div style="height: 96px; background: repeating-linear-gradient(45deg,#efe7db,#efe7db 10px,#e8dece 10px,#e8dece 20px); display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 11px; color: #a88f7e; letter-spacing: 1px;">{{ item.foto }}</div>
+          <h4 style="font-family: 'Libre Caslon Text', serif; font-size: 19px; font-weight: 400; margin: 0; color: #43382f;">{{ item.nome }}</h4>
+          <p style="font-size: 20px; color: #c58a83; margin: 0;">{{ item.valor }}</p>
+          <button onClick="{{ item.onGift }}" style="margin-top: auto; background: none; border: 1px solid #c58a83; color: #a86b64; padding: 11px; font-family: 'Jost',sans-serif; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer;">Presentear</button>
+        </div>
+      </sc-for>
+    </div>
+
+    <h3 style="font-family: 'Libre Caslon Text', serif; font-style: italic; font-size: 28px; font-weight: 400; text-align: center; color: #8f544e; margin: 64px 0 30px;">🏡 Para o nosso lar</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 20px;">
+      <sc-for list="{{ geral }}" as="item" hint-placeholder-count="4">
+        <div style="background: #fbf8f3; border: 1px solid #e6dccd; padding: 26px 24px; text-align: center; display: flex; flex-direction: column; gap: 14px;">
+          <div style="height: 96px; background: repeating-linear-gradient(45deg,#efe7db,#efe7db 10px,#e8dece 10px,#e8dece 20px); display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 11px; color: #a88f7e; letter-spacing: 1px;">{{ item.foto }}</div>
+          <h4 style="font-family: 'Libre Caslon Text', serif; font-size: 19px; font-weight: 400; margin: 0; color: #43382f;">{{ item.nome }}</h4>
+          <p style="font-size: 20px; color: #c58a83; margin: 0;">{{ item.valor }}</p>
+          <button onClick="{{ item.onGift }}" style="margin-top: auto; background: none; border: 1px solid #c58a83; color: #a86b64; padding: 11px; font-family: 'Jost',sans-serif; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer;">Presentear</button>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <!-- GALERIA -->
+  <section id="galeria" style="background: #efe7db; padding: 100px 24px;">
+    <div style="max-width: 1100px; margin: 0 auto;">
+      <div style="text-align: center; margin-bottom: 54px;">
+        <p style="font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: #a88f7e; margin: 0 0 12px;">Momentos</p>
+        <h2 style="font-family: 'Libre Caslon Text', serif; font-size: clamp(34px,5vw,52px); font-weight: 400; margin: 0; color: #43382f;">Nossa história em fotos</h2>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); grid-auto-rows: 220px; gap: 16px;">
+        <sc-for list="{{ galeria }}" as="g" hint-placeholder-count="6">
+          <div style="background: repeating-linear-gradient(45deg,#f6f1ea,#f6f1ea 12px,#eee3d4 12px,#eee3d4 24px); border: 1px solid #ddd0be; display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 12px; color: #a88f7e; letter-spacing: 1px;">{{ g }}</div>
+        </sc-for>
+      </div>
+      <p style="text-align: center; font-size: 13px; color: #a88f7e; margin-top: 24px; font-style: italic; font-family: 'Libre Caslon Text', serif;">Em breve, nossas fotos oficiais aqui.</p>
+    </div>
+  </section>
+
+  <!-- TRAJE -->
+  <section id="traje" style="padding: 100px 24px; max-width: 760px; margin: 0 auto; text-align: center;">
+    <p style="font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: #a88f7e; margin: 0 0 12px;">Dress code</p>
+    <h2 style="font-family: 'Libre Caslon Text', serif; font-size: clamp(34px,5vw,52px); font-weight: 400; margin: 0 0 22px; color: #43382f;">Traje</h2>
+    <p style="font-family: 'Libre Caslon Text', serif; font-style: italic; font-size: 26px; color: #8f544e; margin: 0 0 16px;">Esporte fino</p>
+    <p style="font-size: 16px; line-height: 1.8; color: #6b5e52; margin: 0 auto 34px; max-width: 560px;">Pedimos que reservem o tom branco e off-white para a noiva. Uma paleta em tons suaves e terrosos combina lindamente com a nossa celebração.</p>
+    <div style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;">
+      <span style="width: 44px; height: 44px; border-radius: 50%; background: #c58a83; border: 1px solid #b3766f;"></span>
+      <span style="width: 44px; height: 44px; border-radius: 50%; background: #d9c8b6; border: 1px solid #c9b8a6;"></span>
+      <span style="width: 44px; height: 44px; border-radius: 50%; background: #8a8b6f; border: 1px solid #767750;"></span>
+      <span style="width: 44px; height: 44px; border-radius: 50%; background: #6b5e52; border: 1px solid #5a4e43;"></span>
+      <span style="width: 44px; height: 44px; border-radius: 50%; background: #43382f; border: 1px solid #362d26;"></span>
+    </div>
+  </section>
+
+  <!-- RECADOS -->
+  <section id="recados" style="background: #efe7db; padding: 100px 24px;">
+    <div style="max-width: 760px; margin: 0 auto;">
+      <div style="text-align: center; margin-bottom: 44px;">
+        <p style="font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: #a88f7e; margin: 0 0 12px;">Mural de carinho</p>
+        <h2 style="font-family: 'Libre Caslon Text', serif; font-size: clamp(34px,5vw,52px); font-weight: 400; margin: 0; color: #43382f;">Recados dos convidados</h2>
+      </div>
+
+      <div style="background: #fbf8f3; border: 1px solid #e6dccd; padding: 32px; margin-bottom: 32px;">
+        <input value="{{ recadoNome }}" onChange="{{ onRecadoNome }}" placeholder="Seu nome" style="width: 100%; padding: 13px 16px; margin-bottom: 14px; border: 1px solid #d9c8b6; background: #fff; font-family: 'Jost',sans-serif; font-size: 15px; color: #43382f; outline: none;">
+        <textarea value="{{ recadoMsg }}" onChange="{{ onRecadoMsg }}" placeholder="Escreva um recado para os noivos" rows="3" style="width: 100%; padding: 13px 16px; margin-bottom: 16px; border: 1px solid #d9c8b6; background: #fff; font-family: 'Jost',sans-serif; font-size: 15px; color: #43382f; outline: none; resize: vertical;"></textarea>
+        <button onClick="{{ submitRecado }}" style="background: #c58a83; border: none; color: #fff; padding: 13px 30px; font-family: 'Jost',sans-serif; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer;">Deixar recado</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <sc-for list="{{ recados }}" as="r" hint-placeholder-count="2">
+          <div style="background: #fbf8f3; border: 1px solid #e6dccd; padding: 24px 28px;">
+            <p style="font-size: 16px; line-height: 1.7; color: #43382f; margin: 0 0 10px; font-style: italic; font-family: 'Libre Caslon Text', serif;">“{{ r.msg }}”</p>
+            <p style="font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: #c58a83; margin: 0;">— {{ r.nome }}</p>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <!-- LOCAL / HOSPEDAGEM -->
+  <section id="local" style="padding: 100px 24px; max-width: 1040px; margin: 0 auto;">
+    <div style="text-align: center; margin-bottom: 54px;">
+      <p style="font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: #a88f7e; margin: 0 0 12px;">Como chegar</p>
+      <h2 style="font-family: 'Libre Caslon Text', serif; font-size: clamp(34px,5vw,52px); font-weight: 400; margin: 0; color: #43382f;">Local</h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px,1fr)); gap: 28px; align-items: start;">
+      <iframe title="Recanto Espelho da Lua no mapa" src="https://maps.google.com/maps?q=Recanto%20Espelho%20da%20Lua%20R.%20Domingos%20Jos%C3%A9%20da%20Cruz%20420%20Jardim%20Itaguacu%20Salto%20SP&z=15&output=embed" style="width: 100%; height: 300px; border: 1px solid #ddd0be; display: block;" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      <div>
+        <h3 style="font-family: 'Libre Caslon Text', serif; font-size: 24px; font-weight: 400; margin: 0 0 8px;">Cerimônia</h3>
+        <p style="font-size: 16px; line-height: 1.7; color: #6b5e52; margin: 0 0 20px;">Paróquia São José · R. Gagliano Micai, s/n — Vila Cleto, Itu · SP, 13310-282. A cerca de 100 km de São Paulo, com acesso pela Rodovia Castelo Branco.</p>
+        <h3 style="font-family: 'Libre Caslon Text', serif; font-size: 24px; font-weight: 400; margin: 0 0 8px;">Recepção</h3>
+        <p style="font-size: 16px; line-height: 1.7; color: #6b5e52; margin: 0 0 16px;">Recanto Espelho da Lua · R. Domingos José da Cruz, 420 — Jardim Itaguaçu, Salto · SP, 13323-231. Um jantar para celebrarmos juntos, logo após a cerimônia, com estacionamento no local.</p>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px;">
+          <a href="https://www.google.com/maps/search/?api=1&query=Par%C3%B3quia+S%C3%A3o+Jos%C3%A9+R.+Gagliano+Micai+Vila+Cleto+Itu+SP+13310-282" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 7px; border: 1px solid #c58a83; color: #a86b64; padding: 10px 20px; font-size: 12px; letter-spacing: 2px; text-transform: uppercase;">📍 Cerimônia</a>
+          <a href="https://www.google.com/maps/search/?api=1&query=Recanto+Espelho+da+Lua+R.+Domingos+Jos%C3%A9+da+Cruz+420+Jardim+Itaguacu+Salto+SP+13323-231" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 7px; border: 1px solid #c58a83; color: #a86b64; padding: 10px 20px; font-size: 12px; letter-spacing: 2px; text-transform: uppercase;">📍 Recepção</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer style="background: #43382f; color: #ded2c4; text-align: center; padding: 70px 24px;">
+    <p style="font-family: {{ nomesFont }}; font-size: 52px; margin: 0 0 8px; color: #f6f1ea;">Nayara &amp; Victor</p>
+    <p style="font-size: 14px; letter-spacing: 3px; text-transform: uppercase; color: #b8a795; margin: 0 0 20px;">28 de agosto de 2027 · Itu, SP</p>
+    <p style="font-family: 'Libre Caslon Text', serif; font-style: italic; font-size: 15px; color: #a08f7d; margin: 0;">Feito com amor para celebrar o nosso dia.</p>
+  </footer>
+
+  <!-- GIFT MODAL -->
+  <sc-if value="{{ selectedGift }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeGift }}" style="position: fixed; inset: 0; z-index: 100; background: rgba(67,56,47,0.55); display: flex; align-items: center; justify-content: center; padding: 24px; animation: fadeUp .3s both;">
+      <div onClick="{{ stop }}" style="background: #f6f1ea; max-width: 440px; width: 100%; padding: 44px 40px; text-align: center; border: 1px solid #ddd0be; position: relative;">
+        <button onClick="{{ closeGift }}" style="position: absolute; top: 16px; right: 18px; background: none; border: none; font-size: 22px; color: #a88f7e; cursor: pointer; line-height: 1;">×</button>
+        <p style="font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: #a88f7e; margin: 0 0 8px;">Você escolheu</p>
+        <h3 style="font-family: 'Libre Caslon Text', serif; font-size: 26px; font-weight: 400; margin: 0 0 6px; color: #43382f;">{{ selectedGift.nome }}</h3>
+        <p style="font-family: 'Libre Caslon Text', serif; font-size: 40px; color: #c58a83; margin: 0 0 26px;">{{ selectedGift.valor }}</p>
+        <p style="font-size: 15px; line-height: 1.7; color: #6b5e52; margin: 0 0 20px;">Para presentear, faça um Pix no valor sugerido para a chave abaixo. Muito obrigado pelo carinho!</p>
+        <div style="background: #fbf8f3; border: 1px dashed #c9b8a6; padding: 16px; margin-bottom: 18px;">
+          <p style="font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #a88f7e; margin: 0 0 6px;">Chave Pix</p>
+          <p style="font-family: monospace; font-size: 15px; color: #43382f; margin: 0; word-break: break-all;">{{ pixKey }}</p>
+        </div>
+        <button onClick="{{ copyPix }}" style="width: 100%; background: #c58a83; border: none; color: #fff; padding: 14px; font-family: 'Jost',sans-serif; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer;">{{ copyLabel }}</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- CHECK-IN (validação de presença ao ler o QR) -->
+  <sc-if value="{{ checkinOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; z-index: 120; background: #43382f; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center;">
+      <div style="max-width: 420px; width: 100%; animation: fadeUp .5s both;">
+        <p style="font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: #b8a795; margin: 0 0 8px;">Check-in · Nayara &amp; Victor</p>
+        <sc-if value="{{ checkinFound }}" hint-placeholder-val="{{ true }}">
+          <sc-if value="{{ checkinComing }}" hint-placeholder-val="{{ true }}">
+            <div style="font-size: 64px; margin: 10px 0;">✓</div>
+            <h3 style="font-family: 'Libre Caslon Text', serif; font-size: 34px; font-weight: 400; color: #f6f1ea; margin: 0 0 6px;">Presença validada</h3>
+            <p style="font-family: 'Libre Caslon Text', serif; font-style: italic; font-size: 22px; color: #e3b7b2; margin: 0 0 20px;">{{ checkinName }}</p>
+          </sc-if>
+          <sc-if value="{{ checkinAusente }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size: 60px; margin: 10px 0;">✕</div>
+            <h3 style="font-family: 'Libre Caslon Text', serif; font-size: 30px; font-weight: 400; color: #f6f1ea; margin: 0 0 6px;">Convite marcado como ausente</h3>
+            <p style="font-family: 'Libre Caslon Text', serif; font-style: italic; font-size: 20px; color: #e3b7b2; margin: 0 0 20px;">{{ checkinName }}</p>
+          </sc-if>
+          <sc-if value="{{ checkinPendente }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size: 60px; margin: 10px 0;">⏳</div>
+            <h3 style="font-family: 'Libre Caslon Text', serif; font-size: 30px; font-weight: 400; color: #f6f1ea; margin: 0 0 6px;">Convite válido · ainda sem confirmação</h3>
+            <p style="font-family: 'Libre Caslon Text', serif; font-style: italic; font-size: 20px; color: #e3b7b2; margin: 0 0 20px;">{{ checkinName }}</p>
+          </sc-if>
+        </sc-if>
+        <sc-if value="{{ checkinDesconhecido }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size: 60px; margin: 10px 0;">💌</div>
+          <h3 style="font-family: 'Libre Caslon Text', serif; font-size: 30px; font-weight: 400; color: #f6f1ea; margin: 0 0 6px;">Convite lido</h3>
+          <p style="font-size: 15px; line-height: 1.6; color: #cbb9a7; margin: 0 0 20px; max-width: 320px; margin-left: auto; margin-right: auto;">Este código não está na lista deste dispositivo. Confira na lista de confirmações dos noivos.</p>
+        </sc-if>
+        <p style="font-family: monospace; font-size: 16px; letter-spacing: 2px; color: #b8a795; margin: 0 0 30px;">{{ checkinCode }}</p>
+        <button onClick="{{ closeCheckin }}" style="background: none; border: 1px solid #7a6c5e; color: #ded2c4; padding: 13px 30px; font-family: 'Jost',sans-serif; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer;">Fechar</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- LEITOR DE QR (portaria) — abrir com #scanner -->
+  <sc-if value="{{ scannerOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; z-index: 130; background: #43382f; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 28px 20px; text-align: center; overflow-y: auto;">
+      <p style="font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: #b8a795; margin: 0 0 4px;">Portaria · Nayara &amp; Victor</p>
+      <h3 style="font-family: 'Libre Caslon Text', serif; font-size: 28px; font-weight: 400; color: #f6f1ea; margin: 0 0 18px;">Leitor de convites</h3>
+
+      <sc-if value="{{ scanErro }}" hint-placeholder-val="{{ false }}">
+        <p style="font-size: 15px; line-height: 1.6; color: #e3b7b2; max-width: 340px; margin: 0 0 20px;">{{ scanErro }}</p>
+      </sc-if>
+
+      <div id="nv-qr-reader" style="width: 100%; max-width: 340px; background: #2f271f; border: 1px solid #7a6c5e; border-radius: 8px; overflow: hidden; margin-bottom: 18px;"></div>
+
+      <sc-if value="{{ scanResultNome }}" hint-placeholder-val="{{ false }}">
+        <div style="width: 100%; max-width: 340px; background: {{ scanResultBg }}; padding: 22px; border-radius: 8px; margin-bottom: 16px; animation: fadeUp .3s both;">
+          <div style="font-size: 40px; margin-bottom: 6px;">{{ scanResultIcon }}</div>
+          <p style="font-family: 'Libre Caslon Text', serif; font-size: 22px; color: #fff; margin: 0 0 4px;">{{ scanResultNome }}</p>
+          <p style="font-size: 14px; color: #f6ece4; margin: 0 0 4px;">{{ scanResultLabel }}</p>
+          <p style="font-family: monospace; font-size: 13px; letter-spacing: 2px; color: #f0e0d4; margin: 0;">{{ scanResultCode }}</p>
+        </div>
+      </sc-if>
+
+      <button onClick="{{ closeScanner }}" style="background: none; border: 1px solid #7a6c5e; color: #ded2c4; padding: 13px 30px; font-family: 'Jost',sans-serif; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer;">Fechar leitor</button>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;mostrarContagem&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Seções&quot; },
+  &quot;heroImagem&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Seções&quot; },
+  &quot;estiloNomes&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Manuscrito&quot;, &quot;Serifa&quot;], &quot;default&quot;: &quot;Manuscrito&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Estilo&quot; }
+}">
+class Component extends DCLogic {
+  state = {
+    now: Date.now(),
+    rsvp: { nome: '', status: 'sim', acomp: '0', msg: '' },
+    rsvpDone: false,
+    recadoNome: '', recadoMsg: '',
+    recados: [],
+    selectedGift: null,
+    copied: false,
+    inviteCode: '',
+    checkinCode: null,
+    checkinGuest: null,
+    guest: null,
+    codigoInput: '',
+    codigoErro: false,
+    scannerOpen: false,
+    scanResult: null,
+    scanErro: '',
+  };
+  qrRef = React.createRef();
+
+  lookupPresence(code) {
+    if (!code) return null;
+    const c = code.trim().toUpperCase();
+    try {
+      const list = JSON.parse(localStorage.getItem('nv_rsvp_list') || '[]');
+      const saved = list.find(g => (g.code || '').toUpperCase() === c);
+      if (saved) return { code: saved.code, nome: saved.nome, status: saved.status };
+    } catch (e) {}
+    const g = this.findGuest(c);
+    if (g) return { code: g.code, nome: g.nome, status: 'pendente' };
+    return null;
+  }
+
+  parseCode(text) {
+    if (!text) return '';
+    const m = String(text).match(/(?:checkin|convite)=([A-Za-z0-9-]+)/i);
+    return (m ? m[1] : text).trim();
+  }
+
+  startScanner() {
+    if (this._scanner || !window.Html5Qrcode) return;
+    if (!document.getElementById('nv-qr-reader')) return;
+    try {
+      const scanner = new window.Html5Qrcode('nv-qr-reader');
+      this._scanner = scanner;
+      scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: 240 },
+        decoded => {
+          const code = this.parseCode(decoded);
+          if (code === this._lastScan) return;
+          this._lastScan = code;
+          const found = this.lookupPresence(code);
+          this.setState({ scanResult: found ? { ...found, scanned: code } : { code, unknown: true } });
+          if (navigator.vibrate) navigator.vibrate(80);
+        },
+        () => {}
+      ).catch(err => {
+        this._scanner = null;
+        this.setState({ scanErro: 'Não foi possível acessar a câmera. Use um celular e permita o acesso à câmera.' });
+      });
+    } catch (e) {
+      this.setState({ scanErro: 'Leitor indisponível neste dispositivo.' });
+    }
+  }
+
+  stopScanner() {
+    if (this._scanner) {
+      try { this._scanner.stop().then(() => this._scanner.clear()).catch(() => {}); } catch (e) {}
+      this._scanner = null;
+      this._lastScan = null;
+    }
+  }
+
+  // Lista de convidados — cada um com código único. Edite aqui para adicionar convidados.
+  guestList() {
+    try {
+      const g = JSON.parse(localStorage.getItem('nv_guests') || 'null');
+      if (g && g.length) return g;
+    } catch (e) {}
+    const seed = [
+      { code: 'NV-A1B2', nome: 'Maria & João Silva' },
+      { code: 'NV-C3D4', nome: 'Família Oliveira' },
+      { code: 'NV-E5F6', nome: 'Ana Beatriz Souza' },
+      { code: 'NV-G7H8', nome: 'Carlos e Fernanda' },
+      { code: 'NV-J9K0', nome: 'Tia Lúcia' },
+    ];
+    try { localStorage.setItem('nv_guests', JSON.stringify(seed)); } catch (e) {}
+    return seed;
+  }
+
+  findGuest(code) {
+    if (!code) return null;
+    const c = code.trim().toUpperCase();
+    return this.guestList().find(g => g.code.toUpperCase() === c) || null;
+  }
+
+  loadGuest(code) {
+    const guest = this.findGuest(code);
+    if (!guest) return null;
+    let done = false, saved = null;
+    try {
+      const list = JSON.parse(localStorage.getItem('nv_rsvp_list') || '[]');
+      saved = list.find(g => g.code === guest.code) || null;
+      done = !!saved;
+    } catch (e) {}
+    this.setState({
+      guest,
+      inviteCode: guest.code,
+      rsvp: saved
+        ? { nome: saved.nome, status: saved.status, acomp: saved.acomp, msg: saved.msg || '' }
+        : { nome: guest.nome, status: 'sim', acomp: '0', msg: '' },
+      rsvpDone: done,
+      codigoErro: false,
+    });
+    return guest;
+  }
+
+  componentDidMount() {
+    this.timer = setInterval(() => this.setState({ now: Date.now() }), 1000);
+    try {
+      const r = JSON.parse(localStorage.getItem('nv_recados') || 'null');
+      this.setState({ recados: (r && r.length) ? r : this.seed() });
+    } catch (e) { this.setState({ recados: this.seed() }); }
+    const hash = location.hash || '';
+    const conv = hash.match(/convite=([A-Za-z0-9-]+)/);
+    if (conv) this.loadGuest(conv[1]);
+    if (/scanner/.test(hash)) {
+      this.setState({ scannerOpen: true });
+      if (!window.Html5Qrcode) {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
+        document.head.appendChild(s);
+      }
+      this.scanTimer = setInterval(() => { if (this.state.scannerOpen) this.startScanner(); }, 500);
+    }
+    const m = hash.match(/checkin=([A-Za-z0-9-]+)/);
+    if (m) {
+      let guest = null;
+      try {
+        const list = JSON.parse(localStorage.getItem('nv_rsvp_list') || '[]');
+        guest = list.find(g => g.code === m[1]) || null;
+      } catch (e) {}
+      if (!guest) {
+        const g = this.findGuest(m[1]);
+        if (g) guest = { nome: g.nome, status: 'pendente' };
+      }
+      this.setState({ checkinCode: m[1], checkinGuest: guest });
+    }
+    if (typeof window.qrcode !== 'function') {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js';
+      document.head.appendChild(s);
+    }
+    this.qrTimer = setInterval(() => this.renderQR(), 400);
+  }
+  componentWillUnmount() { clearInterval(this.timer); clearInterval(this.qrTimer); clearInterval(this.scanTimer); this.stopScanner(); }
+
+  renderQR() {
+    if (!this.state.rsvpDone || !this.state.inviteCode) return;
+    const el = this.qrRef.current;
+    const code = this.state.inviteCode;
+    if (!el || typeof window.qrcode !== 'function' || el.dataset.code === code) return;
+    el.dataset.code = code;
+    const url = location.origin + location.pathname + '#checkin=' + code;
+    try {
+      const qr = window.qrcode(0, 'M');
+      qr.addData(url);
+      qr.make();
+      el.innerHTML = qr.createImgTag(6, 0);
+      const img = el.querySelector('img');
+      if (img) { img.style.width = '180px'; img.style.height = '180px'; img.style.imageRendering = 'pixelated'; }
+    } catch (e) { delete el.dataset.code; }
+  }
+
+  seed() {
+    return [
+      { nome: 'Tia Lúcia', msg: 'Que a vida de vocês seja repleta de amor e cumplicidade. Felicidades!' },
+      { nome: 'Marcos & Bia', msg: 'Contamos os dias para celebrar com vocês. Amamos muito!' },
+    ];
+  }
+
+  cd() {
+    const target = new Date('2027-08-28T16:00:00-03:00').getTime();
+    let diff = Math.max(0, target - this.state.now);
+    const s = Math.floor(diff / 1000);
+    const p = n => String(n).padStart(2, '0');
+    return {
+      d: Math.floor(s / 86400),
+      h: p(Math.floor((s % 86400) / 3600)),
+      m: p(Math.floor((s % 3600) / 60)),
+      s: p(s % 60),
+    };
+  }
+
+  renderVals() {
+    const nomesFont = (this.props.estiloNomes === 'Serifa')
+      ? "'Libre Caslon Text', serif"
+      : "'Pinyon Script', cursive";
+    const activeBtn = "flex: 1; padding: 14px; border: 1px solid #c58a83; background: #c58a83; color: #fff; font-family: 'Jost',sans-serif; font-size: 14px; cursor: pointer;";
+    const idleBtn = "flex: 1; padding: 14px; border: 1px solid #d9c8b6; background: #fff; color: #6b5e52; font-family: 'Jost',sans-serif; font-size: 14px; cursor: pointer;";
+
+    const pixKey = 'nayaraevictor.casamento@email.com';
+    const mkGift = arr => arr.map(g => ({ ...g, onGift: () => this.setState({ selectedGift: g, copied: false }) }));
+
+    const chabar = mkGift([
+      { nome: 'Espumante Brut', valor: 'R$ 90', foto: 'foto do item' },
+      { nome: 'Gin importado', valor: 'R$ 180', foto: 'foto do item' },
+      { nome: 'Vinho tinto reserva', valor: 'R$ 120', foto: 'foto do item' },
+      { nome: 'Whisky 12 anos', valor: 'R$ 260', foto: 'foto do item' },
+      { nome: 'Cachaça artesanal', valor: 'R$ 70', foto: 'foto do item' },
+      { nome: 'Espumante rosé', valor: 'R$ 95', foto: 'foto do item' },
+      { nome: 'Vodka premium', valor: 'R$ 150', foto: 'foto do item' },
+      { nome: 'Kit de licores', valor: 'R$ 80', foto: 'foto do item' },
+    ]);
+    const geral = mkGift([
+      { nome: 'Jogo de panelas', valor: 'R$ 400', foto: 'foto do item' },
+      { nome: 'Taças de cristal', valor: 'R$ 220', foto: 'foto do item' },
+      { nome: 'Cafeteira', valor: 'R$ 350', foto: 'foto do item' },
+      { nome: 'Aparelho de jantar', valor: 'R$ 500', foto: 'foto do item' },
+      { nome: 'Cota lua de mel', valor: 'R$ 200', foto: 'foto do item' },
+      { nome: 'Roupa de cama premium', valor: 'R$ 300', foto: 'foto do item' },
+      { nome: 'Air fryer', valor: 'R$ 450', foto: 'foto do item' },
+      { nome: 'Jogo de facas', valor: 'R$ 180', foto: 'foto do item' },
+    ]);
+
+    return {
+      cd: this.cd(),
+      nomesFont,
+      mostrarContagem: this.props.mostrarContagem ?? true,
+      heroImagem: this.props.heroImagem ?? true,
+      rsvp: this.state.rsvp,
+      rsvpDone: this.state.rsvpDone,
+      guestNome: this.state.guest ? this.state.guest.nome : null,
+      pedirCodigo: !this.state.guest && !this.state.rsvpDone,
+      showRsvpForm: !!this.state.guest && !this.state.rsvpDone,
+      nomeTravado: !!this.state.guest,
+      nomeInputStyle: 'width: 100%; padding: 14px 16px; margin-bottom: 24px; border: 1px solid #d9c8b6; background: '
+        + (this.state.guest ? '#f2ece2' : '#fff')
+        + '; font-family: \'Jost\',sans-serif; font-size: 16px; color: #43382f; outline: none;',
+      codigoInput: this.state.codigoInput,
+      codigoErro: this.state.codigoErro,
+      onCodigo: e => this.setState({ codigoInput: e.target.value, codigoErro: false }),
+      buscarCodigo: () => {
+        const g = this.loadGuest(this.state.codigoInput);
+        if (!g) this.setState({ codigoErro: true });
+      },
+      simStyle: this.state.rsvp.status === 'sim' ? activeBtn : idleBtn,
+      naoStyle: this.state.rsvp.status === 'nao' ? activeBtn : idleBtn,
+      onNome: e => this.setState({ rsvp: { ...this.state.rsvp, nome: e.target.value } }),
+      onAcomp: e => this.setState({ rsvp: { ...this.state.rsvp, acomp: e.target.value } }),
+      onRsvpMsg: e => this.setState({ rsvp: { ...this.state.rsvp, msg: e.target.value } }),
+      setSim: () => this.setState({ rsvp: { ...this.state.rsvp, status: 'sim' } }),
+      setNao: () => this.setState({ rsvp: { ...this.state.rsvp, status: 'nao' } }),
+      submitRsvp: () => {
+        const code = this.state.inviteCode;
+        if (!code) { alert('Convite não identificado. Use seu link ou código.'); return; }
+        if (!this.state.rsvp.nome.trim()) { alert('Por favor, preencha seu nome.'); return; }
+        try {
+          const list = JSON.parse(localStorage.getItem('nv_rsvp_list') || '[]');
+          const rec = { ...this.state.rsvp, code, at: new Date().toISOString() };
+          const i = list.findIndex(g => g.code === code);
+          if (i >= 0) list[i] = rec; else list.push(rec);
+          localStorage.setItem('nv_rsvp_list', JSON.stringify(list));
+        } catch (e) {}
+        this.setState({ rsvpDone: true });
+      },
+      resetRsvp: () => this.setState({ rsvpDone: false }),
+
+      chabar, geral,
+      recadoNome: this.state.recadoNome,
+      recadoMsg: this.state.recadoMsg,
+      recados: this.state.recados,
+      onRecadoNome: e => this.setState({ recadoNome: e.target.value }),
+      onRecadoMsg: e => this.setState({ recadoMsg: e.target.value }),
+      submitRecado: () => {
+        if (!this.state.recadoNome.trim() || !this.state.recadoMsg.trim()) { alert('Preencha seu nome e o recado.'); return; }
+        const next = [{ nome: this.state.recadoNome.trim(), msg: this.state.recadoMsg.trim() }, ...this.state.recados];
+        try { localStorage.setItem('nv_recados', JSON.stringify(next)); } catch (e) {}
+        this.setState({ recados: next, recadoNome: '', recadoMsg: '' });
+      },
+
+      galeria: ['foto do casal', 'o pedido', 'primeira viagem', 'ensaio', 'família', 'nós dois'],
+
+      qrRef: this.qrRef,
+      inviteCode: this.state.inviteCode,
+      checkinOpen: !!this.state.checkinCode,
+      checkinCode: this.state.checkinCode,
+      checkinName: this.state.checkinGuest ? this.state.checkinGuest.nome : null,
+      checkinFound: !!this.state.checkinGuest,
+      checkinComing: !!(this.state.checkinGuest && this.state.checkinGuest.status === 'sim'),
+      checkinAusente: !!(this.state.checkinGuest && this.state.checkinGuest.status === 'nao'),
+      checkinPendente: !!(this.state.checkinGuest && this.state.checkinGuest.status !== 'sim' && this.state.checkinGuest.status !== 'nao'),
+      checkinDesconhecido: !!this.state.checkinCode && !this.state.checkinGuest,
+      closeCheckin: () => { try { history.replaceState(null, '', location.pathname); } catch (e) {} this.setState({ checkinCode: null, checkinGuest: null }); },
+
+      scannerOpen: this.state.scannerOpen,
+      scanErro: this.state.scanErro,
+      scanResultNome: this.state.scanResult ? (this.state.scanResult.nome || 'Convite não encontrado') : null,
+      scanResultCode: this.state.scanResult ? this.state.scanResult.code : null,
+      scanResultBg: this.state.scanResult
+        ? (this.state.scanResult.unknown ? '#7a5a55'
+          : this.state.scanResult.status === 'sim' ? '#6f8a5a'
+          : this.state.scanResult.status === 'nao' ? '#a15b52' : '#a8895a')
+        : '#6f8a5a',
+      scanResultIcon: this.state.scanResult
+        ? (this.state.scanResult.unknown ? '❓'
+          : this.state.scanResult.status === 'sim' ? '✓'
+          : this.state.scanResult.status === 'nao' ? '✕' : '⏳')
+        : '✓',
+      scanResultLabel: this.state.scanResult
+        ? (this.state.scanResult.unknown ? 'Código fora da lista'
+          : this.state.scanResult.status === 'sim' ? 'Presença confirmada'
+          : this.state.scanResult.status === 'nao' ? 'Marcado como ausente' : 'Convite válido · sem confirmação')
+        : null,
+      closeScanner: () => { this.stopScanner(); try { history.replaceState(null, '', location.pathname); } catch (e) {} this.setState({ scannerOpen: false, scanResult: null }); },
+
+      selectedGift: this.state.selectedGift,
+      pixKey,
+      copyLabel: this.state.copied ? '✓ Chave copiada!' : 'Copiar chave Pix',
+      closeGift: () => this.setState({ selectedGift: null }),
+      stop: e => e.stopPropagation(),
+      copyPix: () => {
+        try { navigator.clipboard.writeText(pixKey); } catch (e) {}
+        this.setState({ copied: true });
+      },
+    };
+  }
+}
+</script>
+</body>
+</html>

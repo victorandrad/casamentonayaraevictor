@@ -1,0 +1,326 @@
+// Gift orders: creation from the cart, Stripe Checkout Sessions and status sync.
+import Stripe from 'stripe';
+import type { ItemPedido, PedidoAdmin, PedidoInput, PedidoPublico, StatusPedido } from '@nv/shared/types';
+import { precoComTaxa } from '@nv/shared/taxas';
+import { config } from './config.ts';
+import { query, queryOne, transaction } from './db.ts';
+import { getTaxa, PRESENTE_SELECT, toPresente } from './repo.ts';
+import { enviarRecibo } from './email.ts';
+
+export const stripe = config.stripeSecretKey ? new Stripe(config.stripeSecretKey) : null;
+
+export class PedidoInvalido extends Error {}
+
+type PedidoRow = {
+  id: number;
+  status: StatusPedido;
+  nome: string;
+  email: string;
+  mensagem: string;
+  total_centavos: number;
+  subtotal_centavos: number | null;
+  criado_em: Date;
+  pago_em: Date | null;
+  stripe_payment_intent: string | null;
+  forma_pagamento: string | null;
+  bandeira: string | null;
+  taxa_centavos: number | null;
+  liquido_centavos: number | null;
+  recibo_enviado_em: Date | null;
+};
+
+const PEDIDO_COLS = `id, status, nome, email, mensagem, total_centavos, subtotal_centavos, criado_em, pago_em,
+  stripe_payment_intent, forma_pagamento, bandeira, taxa_centavos, liquido_centavos, recibo_enviado_em`;
+
+async function itensDoPedido(pedidoIds: number[]): Promise<Map<number, ItemPedido[]>> {
+  const rows = await query<{ pedido_id: number; nome: string; quantidade: number; valor_centavos: number }>(
+    'SELECT pedido_id, nome, quantidade, valor_centavos FROM pedido_itens WHERE pedido_id = ANY($1) ORDER BY id',
+    [pedidoIds],
+  );
+  const porPedido = new Map<number, ItemPedido[]>();
+  for (const r of rows) {
+    const lista = porPedido.get(r.pedido_id) ?? [];
+    lista.push({ nome: r.nome, quantidade: r.quantidade, valorCentavos: r.valor_centavos });
+    porPedido.set(r.pedido_id, lista);
+  }
+  return porPedido;
+}
+
+// Prices always come from the database, never from the browser.
+export async function criarPedido(input: PedidoInput): Promise<{ url: string }> {
+  if (!stripe) throw new Error('Stripe não configurado');
+
+  const quantidades = new Map<number, number>();
+  for (const item of input.itens) quantidades.set(item.presenteId, (quantidades.get(item.presenteId) ?? 0) + item.quantidade);
+
+  const ids = [...quantidades.keys()];
+  const taxa = await getTaxa();
+  const { nome, email, mensagem } = input.convidado;
+
+  // Everything below runs in one transaction with the gift rows locked, so two
+  // guests can't both take the last unit of a unique gift.
+  const { pedidoId, itens } = await transaction(async (client) => {
+    await client.query('SELECT id FROM presentes WHERE id = ANY($1) ORDER BY id FOR UPDATE', [ids]);
+    const { rows } = await client.query(`${PRESENTE_SELECT} WHERE p.id = ANY($1)`, [ids]);
+    const presentes = rows.map(toPresente);
+    if (presentes.length !== quantidades.size) {
+      throw new PedidoInvalido('Algum presente do carrinho não está mais na lista. Atualize a página e tente de novo.');
+    }
+    for (const p of presentes) {
+      const pedida = quantidades.get(p.id)!;
+      if (p.disponivel !== null && pedida > p.disponivel) {
+        throw new PedidoInvalido(
+          p.disponivel === 0
+            ? `"${p.nome}" acabou de ser presenteado por outra pessoa. Remova do carrinho e escolha outro presente.`
+            : `Restam só ${p.disponivel} unidade(s) de "${p.nome}". Ajuste a quantidade no carrinho.`,
+        );
+      }
+    }
+
+    // Gift values are what the couple receives; each product is charged with the
+    // fee on top, computed here with the same rule the site uses to show prices.
+    const itens = presentes.map((p) => ({
+      id: p.id,
+      nome: p.nome,
+      valor_centavos: p.valorCentavos,
+      quantidade: Math.min(10, quantidades.get(p.id)!),
+      preco_centavos: precoComTaxa(p.valorCentavos, taxa),
+    }));
+    const subtotal = itens.reduce((soma, i) => soma + i.valor_centavos * i.quantidade, 0);
+    const total = itens.reduce((soma, i) => soma + i.preco_centavos * i.quantidade, 0);
+    if (itens.some((i) => i.valor_centavos <= 0) || subtotal < 100) {
+      throw new PedidoInvalido('O valor mínimo para presentear é R$ 1,00.');
+    }
+
+    const inserido = await client.query<{ id: number }>(
+      `INSERT INTO pedidos (nome, email, mensagem, total_centavos, subtotal_centavos)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [nome, email, mensagem, total, subtotal],
+    );
+    const id = inserido.rows[0]!.id;
+    for (const i of itens) {
+      await client.query(
+        'INSERT INTO pedido_itens (pedido_id, presente_id, nome, valor_centavos, quantidade) VALUES ($1, $2, $3, $4, $5)',
+        [id, i.id, i.nome, i.preco_centavos, i.quantidade],
+      );
+    }
+    return { pedidoId: id, itens };
+  });
+
+  const params: Stripe.Checkout.SessionCreateParams = {
+    mode: 'payment',
+    locale: 'pt-BR',
+    customer_email: email,
+    client_reference_id: String(pedidoId),
+    metadata: { pedido_id: String(pedidoId) },
+    line_items: itens.map((i) => ({
+      quantity: i.quantidade,
+      price_data: { currency: 'brl', unit_amount: i.preco_centavos, product_data: { name: i.nome } },
+    })),
+    // Short session so a reserved unique gift is released soon if the guest gives up
+    // (30 minutes is Stripe's minimum).
+    expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
+    success_url: `${config.siteUrl}/?pedido={CHECKOUT_SESSION_ID}#presentes`,
+    cancel_url: `${config.siteUrl}/?pedido=cancelado#presentes`,
+  };
+
+  let session: Stripe.Checkout.Session;
+  try {
+    session = await stripe.checkout.sessions.create(params);
+  } catch (error) {
+    // Don't leave an order behind that can never be paid.
+    await query('DELETE FROM pedidos WHERE id = $1', [pedidoId]);
+    throw error;
+  }
+
+  await query('UPDATE pedidos SET stripe_session_id = $2 WHERE id = $1', [pedidoId, session.id]);
+  if (!session.url) throw new Error('Stripe não retornou a URL do Checkout');
+  return { url: session.url };
+}
+
+// Maps a Checkout Session to our status. A paid order never goes back.
+function statusDaSessao(session: Stripe.Checkout.Session, tipoEvento?: string): StatusPedido | null {
+  if (tipoEvento === 'checkout.session.async_payment_failed') return 'falhou';
+  if (session.payment_status === 'paid' || session.payment_status === 'no_payment_required') return 'pago';
+  if (session.status === 'expired') return 'expirado';
+  if (session.status === 'complete') return 'aguardando'; // async methods (e.g. Pix/boleto) still settling
+  return null;
+}
+
+export async function sincronizarSessao(session: Stripe.Checkout.Session, tipoEvento?: string) {
+  const status = statusDaSessao(session, tipoEvento);
+  if (!status) return;
+  const paymentIntent = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
+  const atualizado = await queryOne<{ id: number }>(
+    `UPDATE pedidos
+        SET status = $2,
+            stripe_payment_intent = coalesce($3, stripe_payment_intent),
+            pago_em = CASE WHEN $2 = 'pago' THEN coalesce(pago_em, now()) ELSE pago_em END
+      WHERE stripe_session_id = $1 AND status <> 'pago'
+      RETURNING id`,
+    [session.id, status, paymentIntent ?? null],
+  );
+  if (atualizado && status === 'pago' && paymentIntent) {
+    const pedidoId = atualizado.id;
+    const temTaxa = await registrarTaxa(pedidoId, paymentIntent);
+    // Receipt goes out in the background so the webhook answers Stripe quickly.
+    void enviarReciboDoPedido(pedidoId);
+    if (!temTaxa) {
+      // Pix settles its balance transaction a few seconds after the payment;
+      // try again shortly (listing the orders also fills any that are left).
+      for (const atraso of [15_000, 90_000]) {
+        setTimeout(() => void registrarTaxa(pedidoId, paymentIntent), atraso).unref();
+      }
+    }
+  }
+}
+
+// Stores the payment method and the fee Stripe actually charged (from the
+// charge's balance transaction), so card, Pix etc. each get their real rate.
+// Best effort: returns false while Stripe hasn't settled the fee yet.
+async function registrarTaxa(pedidoId: number, paymentIntentId: string): Promise<boolean> {
+  if (!stripe) return false;
+  try {
+    const pi = await stripe.paymentIntents.retrieve(paymentIntentId, {
+      expand: ['latest_charge.balance_transaction', 'payment_method'],
+    });
+    const charge = typeof pi.latest_charge === 'object' ? pi.latest_charge : null;
+    const metodo = typeof pi.payment_method === 'object' ? pi.payment_method : null;
+    const bt = charge && typeof charge.balance_transaction === 'object' ? charge.balance_transaction : null;
+    // Fees are only meaningful here when settled in reais.
+    const temTaxa = bt !== null && bt.currency === 'brl';
+    await query(
+      `UPDATE pedidos
+          SET forma_pagamento = coalesce($2, forma_pagamento),
+              bandeira = coalesce($3, bandeira),
+              taxa_centavos = coalesce($4, taxa_centavos),
+              liquido_centavos = coalesce($5, liquido_centavos)
+        WHERE id = $1`,
+      [
+        pedidoId,
+        metodo?.type ?? charge?.payment_method_details?.type ?? null,
+        metodo?.card?.brand ?? null,
+        temTaxa ? bt.fee : null,
+        temTaxa ? bt.net : null,
+      ],
+    );
+    return temTaxa;
+  } catch (error) {
+    console.warn(`não foi possível obter a taxa do pedido ${pedidoId}:`, (error as Error).message);
+    return false;
+  }
+}
+
+// Returns false when the event was already handled (Stripe may deliver it twice).
+export async function registrarEvento(id: string, tipo: string): Promise<boolean> {
+  const row = await queryOne('INSERT INTO stripe_eventos (id, tipo) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING id', [id, tipo]);
+  return row !== null;
+}
+
+// Used by the thank-you screen. The session id (cs_…) is unguessable, so it
+// works as the guest's access token. If the webhook hasn't arrived yet, ask Stripe.
+export async function pedidoPorSessao(sessionId: string): Promise<PedidoPublico | null> {
+  const buscar = () =>
+    queryOne<PedidoRow>(`SELECT ${PEDIDO_COLS} FROM pedidos WHERE stripe_session_id = $1`, [sessionId]);
+  let pedido = await buscar();
+  if (!pedido) return null;
+  if (stripe && (pedido.status === 'pendente' || pedido.status === 'aguardando')) {
+    try {
+      await sincronizarSessao(await stripe.checkout.sessions.retrieve(sessionId));
+      pedido = (await buscar())!;
+    } catch {
+      // keep the stored status if Stripe can't be reached
+    }
+  }
+  const itens = (await itensDoPedido([pedido.id])).get(pedido.id) ?? [];
+  return {
+    status: pedido.status,
+    nome: pedido.nome,
+    subtotalCentavos: pedido.subtotal_centavos ?? pedido.total_centavos,
+    totalCentavos: pedido.total_centavos,
+    itens,
+  };
+}
+
+const listar = () =>
+  query<PedidoRow>(
+    `SELECT ${PEDIDO_COLS}
+       FROM pedidos WHERE status <> 'pendente' OR criado_em > now() - interval '1 day'
+      ORDER BY coalesce(pago_em, criado_em) DESC`,
+  );
+
+export async function listarPedidos(): Promise<PedidoAdmin[]> {
+  let pedidos = await listar();
+  // Fill in fees Stripe hadn't settled when the webhook arrived (a few per request).
+  const semTaxa = pedidos.filter((p) => p.status === 'pago' && p.taxa_centavos === null && p.stripe_payment_intent).slice(0, 10);
+  if (semTaxa.length) {
+    await Promise.all(semTaxa.map((p) => registrarTaxa(p.id, p.stripe_payment_intent!)));
+    pedidos = await listar();
+  }
+  const itens = await itensDoPedido(pedidos.map((p) => p.id));
+  return pedidos.map((p) => ({
+    id: p.id,
+    status: p.status,
+    nome: p.nome,
+    email: p.email,
+    mensagem: p.mensagem,
+    subtotalCentavos: p.subtotal_centavos ?? p.total_centavos,
+    totalCentavos: p.total_centavos,
+    criadoEm: p.criado_em.toISOString(),
+    pagoEm: p.pago_em?.toISOString() ?? null,
+    itens: itens.get(p.id) ?? [],
+    formaPagamento: p.forma_pagamento,
+    bandeira: p.bandeira,
+    taxaCentavos: p.taxa_centavos,
+    liquidoCentavos: p.liquido_centavos,
+    reciboEnviadoEm: p.recibo_enviado_em?.toISOString() ?? null,
+  }));
+}
+
+// Sends the guest's receipt e-mail once. The row is claimed first (so a webhook
+// delivered twice can't send two e-mails) and released again if sending fails.
+// `reenviar` lets the couple send it again from the panel.
+export async function enviarReciboDoPedido(pedidoId: number, { reenviar = false } = {}): Promise<boolean> {
+  const pedido = await queryOne<PedidoRow>(
+    `UPDATE pedidos SET recibo_enviado_em = now()
+      WHERE id = $1 AND status = 'pago' ${reenviar ? '' : 'AND recibo_enviado_em IS NULL'}
+      RETURNING ${PEDIDO_COLS}`,
+    [pedidoId],
+  );
+  if (!pedido) return false;
+  try {
+    const itens = (await itensDoPedido([pedido.id])).get(pedido.id) ?? [];
+    await enviarRecibo({
+      numero: pedido.id,
+      nome: pedido.nome,
+      email: pedido.email,
+      mensagem: pedido.mensagem,
+      itens,
+      totalCentavos: pedido.total_centavos,
+      formaPagamento: pedido.forma_pagamento,
+      pagoEm: pedido.pago_em ?? new Date(),
+    });
+    console.info(`recibo do pedido ${pedido.id} enviado para ${pedido.email}`);
+    return true;
+  } catch (error) {
+    await query('UPDATE pedidos SET recibo_enviado_em = NULL WHERE id = $1', [pedidoId]);
+    console.warn(`falha ao enviar o recibo do pedido ${pedidoId}:`, (error as Error).message);
+    return false;
+  }
+}
+
+// Guest came back from Stripe without paying: expire the session so the gifts it
+// reserved are free again right away (instead of waiting for it to time out).
+export async function cancelarPedidoPendente(sessionId: string): Promise<void> {
+  const pedido = await queryOne<{ id: number }>(
+    "SELECT id FROM pedidos WHERE stripe_session_id = $1 AND status = 'pendente'",
+    [sessionId],
+  );
+  if (!pedido || !stripe) return;
+  try {
+    await sincronizarSessao(await stripe.checkout.sessions.expire(sessionId));
+  } catch {
+    // Already completed or expired on Stripe's side: just sync what it says.
+    await sincronizarSessao(await stripe.checkout.sessions.retrieve(sessionId)).catch(() => {});
+  }
+}

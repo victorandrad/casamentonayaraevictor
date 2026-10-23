@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "site",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 4000,
+      "autoPort": false
+    },
+    {
+      "name": "design-original",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "http-server@14.1.1", "design", "-p", "8080", "-c-1"],
+      "port": 8080
+    }
+  ]
+}

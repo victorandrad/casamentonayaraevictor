@@ -1,0 +1,52 @@
+/* Recados */
+.recados-form {
+  background: var(--nv-card);
+  border: 1px solid var(--nv-border);
+  border-radius: 18px;
+  padding: 32px;
+  margin-bottom: 32px;
+  box-shadow: 0 24px 50px -40px rgba(143, 84, 78, 0.4);
+}
+.recados-form .nv-input { font-size: 15px; padding: 13px 16px; margin-bottom: 14px; }
+.recados-form textarea.nv-input { margin-bottom: 16px; }
+.recados-form .nv-btn { font-size: 13px; padding: 13px 30px; }
+.recados-list { display: flex; flex-direction: column; gap: 16px; }
+.recados-item {
+  position: relative;
+  background: var(--nv-card);
+  border: 1px solid var(--nv-blush-line);
+  border-radius: 18px;
+  padding: 26px 30px 22px 64px;
+}
+.recados-item::before {
+  content: '“';
+  position: absolute;
+  left: 20px;
+  top: 14px;
+  font-family: var(--nv-serif);
+  font-size: 56px;
+  line-height: 1;
+  color: rgba(197, 138, 131, 0.5);
+}
+.recados-item__msg {
+  font-family: var(--nv-serif);
+  font-style: italic;
+  font-size: 16px;
+  line-height: 1.7;
+  margin: 0 0 10px;
+}
+.recados-item__author {
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--nv-rose);
+  margin: 0;
+}
+.recados-error { font-size: 13px; color: var(--nv-rose-dark); margin: -4px 0 14px; }
+.recados-empty {
+  text-align: center;
+  font-family: var(--nv-serif);
+  font-style: italic;
+  color: var(--nv-taupe);
+  margin: 10px 0;
+}

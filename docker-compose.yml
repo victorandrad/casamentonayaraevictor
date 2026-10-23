@@ -1,0 +1,123 @@
+name: casamento-nv
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-casamento}
+      POSTGRES_USER: ${POSTGRES_USER:-casamento}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4100
+      DATABASE_URL: postgres://${POSTGRES_USER:-casamento}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-casamento}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:4000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_NOME: ${ADMIN_NOME:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      SITE_URL: ${SITE_URL:-http://localhost:4000}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      # E-mail (receipts). Defaults point to the local Mailpit server below.
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-Nayara & Victor <presentes@nayaraevictor.local>}
+      EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-}
+    ports:
+      - "${API_PORT:-4100}:4100"
+    volumes:
+      - uploads-data:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
+  # Own mail server for development: receives every e-mail the API sends and
+  # shows it at http://localhost:8025 (nothing leaves the machine).
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+    volumes:
+      - mail-data:/data
+
+  # Own mail server for production (Postfix + Dovecot + DKIM), off by default.
+  # Needs a VPS with a fixed public IP, port 25 open and the DNS records in the
+  # README. Start with:  docker compose --profile email up -d mailserver
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    profiles: ["email"]
+    hostname: ${MAIL_HOSTNAME:-mail.nayaraevictor.com.br}
+    restart: unless-stopped
+    environment:
+      ENABLE_RSPAMD: 1
+      ENABLE_OPENDKIM: 0
+      ENABLE_OPENDMARC: 0
+      ENABLE_POLICYD_SPF: 0
+      ENABLE_AMAVIS: 0
+      ENABLE_CLAMAV: 0
+      ENABLE_FAIL2BAN: 1
+      SSL_TYPE: ${MAIL_SSL_TYPE:-letsencrypt}
+      PERMIT_DOCKER: network
+    ports:
+      - "25:25"
+      - "587:587"
+      - "465:465"
+    volumes:
+      - mail-server-data:/var/mail
+      - mail-server-state:/var/mail-state
+      - mail-server-config:/tmp/docker-mailserver
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    cap_add:
+      - NET_ADMIN
+
+  # Local only: forwards Stripe test events to the API.
+  #   docker compose --profile stripe up -d stripe-cli
+  #   docker compose logs stripe-cli   → copy the whsec_… into STRIPE_WEBHOOK_SECRET
+  stripe-cli:
+    image: stripe/stripe-cli:latest
+    profiles: ["stripe"]
+    restart: unless-stopped
+    command: >
+      listen
+      --latest
+      --api-key ${STRIPE_SECRET_KEY:-}
+      --forward-to http://api:4100/api/stripe/webhook
+      --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,checkout.session.expired
+    depends_on:
+      - api
+
+volumes:
+  db-data:
+  uploads-data:
+  mail-data:
+  mail-server-data:
+  mail-server-state:
+  mail-server-config:

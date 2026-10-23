@@ -1,0 +1,23 @@
+{
+  "name": "site-casamento-nayara-victor",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n shell,evento,rsvp,presentes,mural,painel -c magenta,blue,green,yellow,cyan,red \"npm:dev -w @nv/shell\" \"npm:dev -w @nv/evento\" \"npm:dev -w @nv/rsvp\" \"npm:dev -w @nv/presentes\" \"npm:dev -w @nv/mural\" \"npm:dev -w @nv/painel\"",
+    "dev:api": "npm run dev -w @nv/api",
+    "build": "npm run build --workspaces --if-present",
+    "preview": "concurrently -k -n shell,evento,rsvp,presentes,mural,painel \"npm:preview -w @nv/shell\" \"npm:preview -w @nv/evento\" \"npm:preview -w @nv/rsvp\" \"npm:preview -w @nv/presentes\" \"npm:preview -w @nv/mural\" \"npm:preview -w @nv/painel\"",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f api",
+    "db:seed": "docker compose exec api node src/seed.ts",
+    "db:psql": "docker compose exec db psql -U casamento -d casamento"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  }
+}

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="rose" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d6a19a"/>
+      <stop offset="1" stop-color="#b3766f"/>
+    </linearGradient>
+  </defs>
+  <!-- Invitation arch -->
+  <path d="M9 61V31a23 23 0 0 1 46 0v30z" fill="url(#rose)"/>
+  <path d="M14.5 57V31.5a17.5 17.5 0 0 1 35 0V57z" fill="none" stroke="#f6f1ea" stroke-width="1.6" opacity=".6"/>
+  <!-- Heart -->
+  <path d="M32 48.5s-11-6.6-11-14.2a6 6 0 0 1 11-3.4 6 6 0 0 1 11 3.4c0 7.6-11 14.2-11 14.2z" fill="#f6f1ea"/>
+</svg>
