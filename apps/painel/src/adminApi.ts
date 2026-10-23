@@ -33,12 +33,13 @@ export function formatDate(iso: string) {
 }
 
 // Uploads a gift photo (multipart) and returns its URL. The API re-encodes it.
-export async function enviarFoto(arquivo: File): Promise<string> {
+// tipo 'galeria' keeps a larger image (gallery photos open full screen).
+export async function enviarFoto(arquivo: File, tipo: 'presente' | 'galeria' = 'presente'): Promise<string> {
   const form = new FormData();
   form.append('foto', arquivo);
   let res: Response;
   try {
-    res = await fetch('/api/admin/uploads', { method: 'POST', body: form, credentials: 'same-origin' });
+    res = await fetch(`/api/admin/uploads?tipo=${tipo}`, { method: 'POST', body: form, credentials: 'same-origin' });
   } catch {
     throw new Error('Sem conexão com o servidor. Tente novamente.');
   }

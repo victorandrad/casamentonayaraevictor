@@ -57,7 +57,7 @@ export function Lightbox({ fotos, indice, onMudar, onFechar }: Props) {
   };
 
   return (
-    <div className="lightbox" role="dialog" aria-modal="true" aria-label={`Foto: ${foto.legenda}`} onClick={onFechar}>
+    <div className="lightbox" role="dialog" aria-modal="true" aria-label={`Foto: ${foto.legenda || 'Nayara e Victor'}`} onClick={onFechar}>
       <button ref={fechar} className="lightbox__close" onClick={onFechar} aria-label="Fechar">
         ×
       </button>
@@ -92,7 +92,7 @@ export function Lightbox({ fotos, indice, onMudar, onFechar }: Props) {
             <button
               key={f.id}
               className={i === indice ? 'lightbox__thumb is-active' : 'lightbox__thumb'}
-              aria-label={`Ver ${f.legenda}`}
+              aria-label={`Ver ${f.legenda || 'foto'}`}
               aria-current={i === indice}
               onClick={() => {
                 setDirecao(i > indice ? 'prox' : 'ant');

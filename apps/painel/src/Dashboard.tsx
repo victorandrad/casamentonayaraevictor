@@ -8,6 +8,7 @@ import { Presentes } from './abas/Presentes';
 import { Recebidos } from './abas/Recebidos';
 import { Configuracoes } from './abas/Configuracoes';
 import { Emails } from './abas/Emails';
+import { Galeria } from './abas/Galeria';
 
 const abas = [
   { id: 'resumo', label: 'Resumo', icon: 'heart' },
@@ -15,6 +16,7 @@ const abas = [
   { id: 'recados', label: 'Recados', icon: 'rings' },
   { id: 'recebidos', label: 'Recebidos', icon: 'gift' },
   { id: 'presentes', label: 'Lista de presentes', icon: 'home' },
+  { id: 'galeria', label: 'Galeria', icon: 'camera' },
   { id: 'emails', label: 'E-mails', icon: 'envelope' },
   { id: 'configuracoes', label: 'Configurações', icon: 'calendar' },
 ] as const satisfies ReadonlyArray<{ id: string; label: string; icon: IconName }>;
@@ -64,6 +66,7 @@ export function Dashboard({ usuario, onSair }: { usuario: Usuario; onSair: () =>
         {aba === 'recados' && <Recados />}
         {aba === 'recebidos' && <Recebidos />}
         {aba === 'presentes' && <Presentes />}
+        {aba === 'galeria' && <Galeria />}
         {aba === 'emails' && <Emails />}
         {aba === 'configuracoes' && <Configuracoes usuario={usuario} />}
       </main>

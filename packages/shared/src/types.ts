@@ -51,6 +51,10 @@ export type Usuario = { id: number; email: string; nome: string };
 export type LoginInput = { email: string; senha: string };
 
 // Admin
+// Gallery photo uploaded in the panel; `momento` is one of MOMENTOS (galeria.ts).
+export type FotoGaleria = { id: number; url: string; legenda: string; momento: string; ordem: number };
+export type FotoGaleriaInput = { url: string; legenda: string; momento: string };
+
 // Mailboxes of the couple's own mail server, managed in the panel (E-mails tab).
 export type CaixaEmail = { endereco: string };
 export type ApelidoEmail = { endereco: string; destinos: string[] };

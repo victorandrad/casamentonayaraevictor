@@ -4,8 +4,18 @@ import { enviarFoto } from './adminApi';
 
 const LIMITE_MB = 10;
 
-// Photo field for a gift: pick a file, it uploads right away and shows a preview.
-export function FotoUpload({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+// Photo field (gifts and gallery): pick a file, it uploads right away and shows a preview.
+export function FotoUpload({
+  value,
+  onChange,
+  tipo = 'presente',
+  removivel = true,
+}: {
+  value: string;
+  onChange: (url: string) => void;
+  tipo?: 'presente' | 'galeria';
+  removivel?: boolean;
+}) {
   const input = useRef<HTMLInputElement>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
@@ -19,7 +29,7 @@ export function FotoUpload({ value, onChange }: { value: string; onChange: (url:
     }
     setEnviando(true);
     try {
-      onChange(await enviarFoto(arquivo));
+      onChange(await enviarFoto(arquivo, tipo));
     } catch (error) {
       setErro((error as Error).message);
     } finally {
@@ -49,7 +59,7 @@ export function FotoUpload({ value, onChange }: { value: string; onChange: (url:
         <button type="button" className="painel-link" onClick={() => input.current?.click()} disabled={enviando}>
           {value ? 'Trocar foto' : 'Enviar foto'}
         </button>
-        {value && !enviando && (
+        {value && !enviando && removivel && (
           <button type="button" className="painel-link painel-link--danger" onClick={() => onChange('')}>
             Remover
           </button>

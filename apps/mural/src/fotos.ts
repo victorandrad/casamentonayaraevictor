@@ -1,28 +1,21 @@
-// Gallery content. Add `src` (and `alt`) to a photo once the real picture is ready;
-// until then it shows as a soft placeholder with its caption.
-export type Momento = 'nos' | 'pedido' | 'viagens' | 'familia';
+// Gallery photos come from the API (the couple upload them in the panel, Galeria tab).
+import { api } from '@nv/shared/api';
+import { MOMENTOS, type Momento } from '@nv/shared/galeria';
+import type { FotoGaleria } from '@nv/shared/types';
+
+export type { Momento };
 
 export type Foto = {
   id: string;
   legenda: string;
-  momento: Momento;
+  momento: string;
   src?: string;
   alt?: string;
 };
 
-export const momentos: Array<{ id: Momento | 'todos'; label: string }> = [
-  { id: 'todos', label: 'Todos' },
-  { id: 'nos', label: 'Nós dois' },
-  { id: 'pedido', label: 'O pedido' },
-  { id: 'viagens', label: 'Viagens' },
-  { id: 'familia', label: 'Família' },
-];
+export const momentos: Array<{ id: Momento | 'todos'; label: string }> = [{ id: 'todos', label: 'Todos' }, ...MOMENTOS];
 
-export const fotos: Foto[] = [
-  { id: 'casal', legenda: 'Foto do casal', momento: 'nos' },
-  { id: 'pedido', legenda: 'O pedido', momento: 'pedido' },
-  { id: 'viagem', legenda: 'Primeira viagem', momento: 'viagens' },
-  { id: 'ensaio', legenda: 'Ensaio', momento: 'nos' },
-  { id: 'familia', legenda: 'Família', momento: 'familia' },
-  { id: 'nos-dois', legenda: 'Nós dois', momento: 'nos' },
-];
+export async function carregarFotos(): Promise<Foto[]> {
+  const lista = await api<FotoGaleria[]>('/public/galeria');
+  return lista.map((f) => ({ id: String(f.id), legenda: f.legenda, momento: f.momento, src: f.url, alt: f.legenda || 'Nayara e Victor' }));
+}

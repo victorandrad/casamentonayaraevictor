@@ -15,6 +15,7 @@ COPY packages/shared/src/taxas.ts packages/shared/src/taxas.ts
 COPY packages/shared/src/types.ts packages/shared/src/types.ts
 COPY packages/shared/src/config.ts packages/shared/src/config.ts
 COPY packages/shared/src/categorias.ts packages/shared/src/categorias.ts
+COPY packages/shared/src/galeria.ts packages/shared/src/galeria.ts
 COPY apps/api/src apps/api/src
 COPY apps/api/migrations apps/api/migrations
 

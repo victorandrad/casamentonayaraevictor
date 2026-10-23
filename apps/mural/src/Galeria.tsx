@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState, type PointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import { EstadoVazio, Icon, SectionHeader } from '@nv/shared';
-import { fotos, momentos, type Momento } from './fotos';
+import { carregarFotos, momentos, type Foto, type Momento } from './fotos';
 import { FotoImagem } from './FotoImagem';
 import { Lightbox } from './Lightbox';
 import './galeria.css';
@@ -28,19 +28,27 @@ function endireitar(e: PointerEvent<HTMLButtonElement>) {
 }
 
 export default function Galeria() {
+  const [fotos, setFotos] = useState<Foto[] | null>(null);
   const [filtro, setFiltro] = useState<Momento | 'todos'>('todos');
   const [aberta, setAberta] = useState<number | null>(null);
   const gatilho = useRef<HTMLElement | null>(null);
 
-  const visiveis = useMemo(() => (filtro === 'todos' ? fotos : fotos.filter((f) => f.momento === filtro)), [filtro]);
-  const disponiveis = momentos.filter((m) => m.id === 'todos' || fotos.some((f) => f.momento === m.id));
+  useEffect(() => {
+    carregarFotos()
+      .then(setFotos)
+      .catch(() => setFotos([]));
+  }, []);
+
+  const lista = useMemo(() => fotos ?? [], [fotos]);
+  const visiveis = useMemo(() => (filtro === 'todos' ? lista : lista.filter((f) => f.momento === filtro)), [filtro, lista]);
+  const disponiveis = momentos.filter((m) => m.id === 'todos' || lista.some((f) => f.momento === m.id));
 
   return (
     <section id="galeria" className="nv-section nv-section--alt">
       <div className="nv-container--wide">
         <SectionHeader eyebrow="Momentos" title="Nossa história em fotos" />
 
-        {fotos.length === 0 && (
+        {fotos?.length === 0 && (
           <EstadoVazio icon="camera" titulo="Em breve, nossas fotos">
             Estamos escolhendo os momentos mais especiais da nossa história para mostrar aqui.
           </EstadoVazio>
@@ -74,7 +82,7 @@ export default function Galeria() {
                 gatilho.current = e.currentTarget;
                 setAberta(i);
               }}
-              aria-label={`Ampliar: ${foto.legenda}`}
+              aria-label={`Ampliar: ${foto.legenda || 'foto'}`}
             >
               <span className="galeria-card__frame">
                 <FotoImagem foto={foto} className="galeria-card__img" />
@@ -90,7 +98,7 @@ export default function Galeria() {
           ))}
         </div>
 
-        <p className="galeria-note">Em breve, nossas fotos oficiais aqui. Toque em uma foto para ampliar.</p>
+        {lista.length > 0 && <p className="galeria-note">Toque em uma foto para ampliar.</p>}
       </div>
 
       {aberta !== null && (

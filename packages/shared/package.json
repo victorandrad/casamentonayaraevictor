@@ -12,7 +12,8 @@
     "./api": "./src/api.ts",
     "./taxas": "./src/taxas.ts",
     "./config": "./src/config.ts",
-    "./categorias": "./src/categorias.ts"
+    "./categorias": "./src/categorias.ts",
+    "./galeria": "./src/galeria.ts"
   },
   "peerDependencies": {
     "react": "^19.0.0"

@@ -1,5 +1,5 @@
-// Gift photos uploaded from the panel. Every image is re-encoded with sharp
-// (resized to fit 1200px, WebP), which also strips metadata such as GPS and
+// Photos uploaded from the panel (gifts and gallery). Every image is re-encoded with
+// sharp (resized to fit, WebP), which also strips metadata such as GPS and
 // guarantees we only ever store and serve real images.
 import { randomBytes } from 'node:crypto';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
@@ -18,12 +18,16 @@ export async function garantirPastaUploads() {
   await mkdir(config.uploadsDir, { recursive: true });
 }
 
-export async function salvarImagem(conteudo: Buffer): Promise<string> {
+// Gift photos show small; gallery photos open full screen.
+export const LADO_PRESENTE = 1200;
+export const LADO_GALERIA = 2000;
+
+export async function salvarImagem(conteudo: Buffer, lado = LADO_PRESENTE): Promise<string> {
   let webp: Buffer;
   try {
     webp = await sharp(conteudo, { limitInputPixels: 50_000_000 })
       .rotate() // honour the phone's orientation before metadata is dropped
-      .resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
+      .resize({ width: lado, height: lado, fit: 'inside', withoutEnlargement: true })
       .webp({ quality: 82 })
       .toBuffer();
   } catch {

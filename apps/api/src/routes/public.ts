@@ -82,6 +82,8 @@ export async function publicRoutes(app: FastifyInstance) {
     },
   );
 
+  app.get('/galeria', async () => repo.listFotos());
+
   app.get('/presentes', async (): Promise<ListaPresentes> => ({
     categorias: await repo.listCategorias(),
     presentes: await repo.listPresentes(),

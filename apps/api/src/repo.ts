@@ -4,6 +4,8 @@ import type {
   Categoria,
   CategoriaInput,
   Checkin,
+  FotoGaleria,
+  FotoGaleriaInput,
   OrganizacaoLista,
   ConvidadoAdmin,
   ConvidadoInput,
@@ -385,6 +387,48 @@ export async function updatePresente(id: number, input: PresenteInput): Promise<
 
 export async function deletePresente(id: number): Promise<boolean> {
   return (await query('DELETE FROM presentes WHERE id = $1 RETURNING id', [id])).length > 0;
+}
+
+// ---- Galeria ----
+
+const FOTO_COLUNAS = 'id, url, legenda, momento, ordem';
+
+export async function listFotos(): Promise<FotoGaleria[]> {
+  return query<FotoGaleria>(`SELECT ${FOTO_COLUNAS} FROM galeria_fotos ORDER BY ordem, id`);
+}
+
+// New photos go to the end of the gallery.
+export async function createFoto(input: FotoGaleriaInput): Promise<FotoGaleria> {
+  return (await queryOne<FotoGaleria>(
+    `INSERT INTO galeria_fotos (url, legenda, momento, ordem)
+     VALUES ($1, $2, $3, (SELECT coalesce(max(ordem), 0) + 1 FROM galeria_fotos))
+     RETURNING ${FOTO_COLUNAS}`,
+    [input.url, input.legenda, input.momento],
+  ))!;
+}
+
+// Returns the updated photo and the previous file (to delete it when the image was replaced).
+export async function updateFoto(id: number, input: FotoGaleriaInput): Promise<{ foto: FotoGaleria; urlAnterior: string } | null> {
+  const anterior = await queryOne<{ url: string }>('SELECT url FROM galeria_fotos WHERE id = $1', [id]);
+  if (!anterior) return null;
+  const foto = await queryOne<FotoGaleria>(
+    `UPDATE galeria_fotos SET url = $2, legenda = $3, momento = $4 WHERE id = $1 RETURNING ${FOTO_COLUNAS}`,
+    [id, input.url, input.legenda, input.momento],
+  );
+  return foto ? { foto, urlAnterior: anterior.url } : null;
+}
+
+export async function deleteFoto(id: number): Promise<string | null> {
+  return (await queryOne<{ url: string }>('DELETE FROM galeria_fotos WHERE id = $1 RETURNING url', [id]))?.url ?? null;
+}
+
+// Order follows the given ids (drag and drop in the panel).
+export async function ordenarFotos(ids: number[]): Promise<FotoGaleria[]> {
+  await query(
+    `UPDATE galeria_fotos g SET ordem = o.pos FROM unnest($1::int[]) WITH ORDINALITY AS o(id, pos) WHERE g.id = o.id`,
+    [ids],
+  );
+  return listFotos();
 }
 
 // ---- Configurações ----

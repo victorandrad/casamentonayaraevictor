@@ -16,10 +16,11 @@ on:
     paths:
       - 'apps/api/**'
       - 'docker/api.Dockerfile'
-      # A API usa estes arquivos do shared (contrato, taxas, categorias, dados do casamento).
+      # A API usa estes arquivos do shared (contrato, taxas, categorias, momentos da galeria, dados do casamento).
       - 'packages/shared/src/types.ts'
       - 'packages/shared/src/taxas.ts'
       - 'packages/shared/src/categorias.ts'
+      - 'packages/shared/src/galeria.ts'
       - 'packages/shared/src/config.ts'
       - 'eslint.config.mjs'
       - 'package.json'

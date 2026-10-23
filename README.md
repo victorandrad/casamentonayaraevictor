@@ -97,6 +97,10 @@ As formas de pagamento são ligadas no [Dashboard do Stripe](https://dashboard.s
 
 Use a chave **live** e crie no Dashboard um endpoint de webhook apontando para `https://casamentonayaraevictor.com.br/api/stripe/webhook` com os eventos `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` e `checkout.session.expired`; o `whsec_...` desse endpoint vai em `STRIPE_WEBHOOK_SECRET`.
 
+## Galeria de fotos
+
+A seção "Nossa história em fotos" do site lê as fotos da API (`GET /api/public/galeria`). No painel, aba **Galeria**: **Enviar fotos** (várias de uma vez, com o momento: Nós dois, O pedido, Viagens, Família ou O casamento), editar legenda, momento e a própria imagem, excluir e reordenar arrastando (no celular, toque e segure). As imagens passam pelo mesmo upload das fotos dos presentes, mas guardadas com até 2000 px, porque abrem em tela cheia; ao excluir ou trocar uma foto, o arquivo antigo é apagado. No site, os filtros mostram só os momentos que têm fotos; sem nenhuma, aparece "Em breve, nossas fotos".
+
 ## Fotos dos presentes
 
 No painel, cada presente tem um campo de **upload de foto** (JPG, PNG, WebP ou HEIC, até 10 MB). A API (`POST /api/admin/uploads`) re-codifica toda imagem com `sharp` — reduz para no máximo 1200px, converte para WebP e remove metadados como GPS — e guarda no volume Docker `uploads-data` (`/app/uploads`), servindo em `/api/uploads/<arquivo>.webp` com cache longo. Ao trocar a foto ou remover o presente, o arquivo antigo é apagado. Para backup, inclua esse volume junto com o do banco.
@@ -221,6 +225,5 @@ Mudou um valor? Rode *Actions → Backend → Run workflow* (ou espere o próxim
 
 ## Pendências
 
-- Fotos da galeria ainda são placeholders (as dos presentes já são enviadas pelo painel).
 - Stripe: falta informar as chaves (teste e depois produção) e ativar as formas de pagamento desejadas no Dashboard.
 - Deploy: pipelines prontos; falta preparar o servidor e cadastrar o secret `VPS_SSH_KEY` (seção Deploy).

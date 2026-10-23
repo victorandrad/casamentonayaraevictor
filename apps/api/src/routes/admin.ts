@@ -1,10 +1,11 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { ICONES_CATEGORIA } from '@nv/shared/categorias';
-import type { CategoriaInput, Configuracoes, ConvidadoInput, OrganizacaoLista, PresenteInput } from '@nv/shared/types';
+import { IDS_MOMENTOS } from '@nv/shared/galeria';
+import type { CategoriaInput, Configuracoes, ConvidadoInput, FotoGaleriaInput, OrganizacaoLista, PresenteInput } from '@nv/shared/types';
 import { requireAuth } from '../auth.ts';
 import * as repo from '../repo.ts';
 import { enviarReciboDoPedido, listarPedidos } from '../pedidos.ts';
-import { ImagemInvalida, removerImagem, salvarImagem, TIPOS_ACEITOS } from '../uploads.ts';
+import { ImagemInvalida, LADO_GALERIA, LADO_PRESENTE, removerImagem, salvarImagem, TIPOS_ACEITOS } from '../uploads.ts';
 import * as emails from '../emails.ts';
 
 const idParams = {
@@ -34,6 +35,18 @@ const presenteBody = {
     // An uploaded photo (/api/uploads/<hex>.webp) or an external https link
     fotoUrl: { type: ['string', 'null'], maxLength: 1000, pattern: '^(https?://.*|/api/uploads/[a-f0-9]{32}\\.webp)?$' },
     quantidadeMaxima: { type: ['integer', 'null'], minimum: 1, maximum: 1000 },
+  },
+} as const;
+
+const fotoGaleriaBody = {
+  type: 'object',
+  required: ['url', 'legenda', 'momento'],
+  additionalProperties: false,
+  properties: {
+    // Only photos uploaded here (/api/uploads/<hex>.webp)
+    url: { type: 'string', pattern: '^/api/uploads/[a-f0-9]{32}\\.webp$' },
+    legenda: { type: 'string', maxLength: 140 },
+    momento: { enum: IDS_MOMENTOS },
   },
 } as const;
 
@@ -110,8 +123,11 @@ export async function adminRoutes(app: FastifyInstance) {
     (await repo.deleteRecado(req.params.id)) ? reply.code(204).send() : reply.code(404).send(notFound),
   );
 
-  // Photo upload for gifts (multipart, field "foto")
-  app.post('/uploads', async (req, reply) => {
+  // Photo upload (multipart, field "foto"). ?tipo=galeria keeps a larger image for the full-screen viewer.
+  app.post<{ Querystring: { tipo?: 'presente' | 'galeria' } }>(
+    '/uploads',
+    { schema: { querystring: { type: 'object', properties: { tipo: { enum: ['presente', 'galeria'] } } } } },
+    async (req, reply) => {
     const arquivo = await req.file();
     if (!arquivo) return reply.code(400).send({ erro: 'Escolha uma imagem para enviar.' });
     if (!TIPOS_ACEITOS.includes(arquivo.mimetype)) {
@@ -124,11 +140,53 @@ export async function adminRoutes(app: FastifyInstance) {
       return reply.code(413).send({ erro: 'A imagem é muito grande. O limite é 10 MB.' });
     }
     try {
-      return reply.code(201).send({ url: await salvarImagem(conteudo) });
+      return reply.code(201).send({ url: await salvarImagem(conteudo, req.query.tipo === 'galeria' ? LADO_GALERIA : LADO_PRESENTE) });
     } catch (error) {
       if (error instanceof ImagemInvalida) return reply.code(400).send({ erro: error.message });
       throw error;
     }
+    },
+  );
+
+  // Galeria de fotos do site
+  app.get('/galeria', async () => repo.listFotos());
+
+  app.post<{ Body: FotoGaleriaInput }>('/galeria', { schema: { body: fotoGaleriaBody } }, async (req, reply) =>
+    reply.code(201).send(await repo.createFoto({ ...req.body, legenda: req.body.legenda.trim() })),
+  );
+
+  // Before /galeria/:id so "ordem" is not read as an id.
+  app.put<{ Body: { ids: number[] } }>(
+    '/galeria/ordem',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['ids'],
+          additionalProperties: false,
+          properties: { ids: { type: 'array', maxItems: 2000, uniqueItems: true, items: { type: 'integer', minimum: 1 } } },
+        },
+      },
+    },
+    async (req) => repo.ordenarFotos(req.body.ids),
+  );
+
+  app.put<{ Params: { id: number }; Body: FotoGaleriaInput }>(
+    '/galeria/:id',
+    { schema: { params: idParams, body: fotoGaleriaBody } },
+    async (req, reply) => {
+      const resultado = await repo.updateFoto(req.params.id, { ...req.body, legenda: req.body.legenda.trim() });
+      if (!resultado) return reply.code(404).send(notFound);
+      if (resultado.urlAnterior !== resultado.foto.url) await removerImagem(resultado.urlAnterior);
+      return resultado.foto;
+    },
+  );
+
+  app.delete<{ Params: { id: number } }>('/galeria/:id', { schema: { params: idParams } }, async (req, reply) => {
+    const url = await repo.deleteFoto(req.params.id);
+    if (url === null) return reply.code(404).send(notFound);
+    await removerImagem(url);
+    return reply.code(204).send();
   });
 
   // Categorias da lista de presentes
