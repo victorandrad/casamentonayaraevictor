@@ -365,8 +365,8 @@ export function Emails() {
           </h3>
           {data.apelidos.length === 0 ? (
             <EstadoVazio compacto icon="envelope" titulo="Nenhum apelido">
-              Os recibos dos presentes saem como presentes@{data.dominio}: crie esse apelido para as respostas dos convidados
-              chegarem numa caixa.
+              Um apelido entrega as mensagens em outra caixa ou num e-mail de fora (ex.: noivos@{data.dominio} → contato@
+              {data.dominio}).
             </EstadoVazio>
           ) : (
             <ul className="painel-list">

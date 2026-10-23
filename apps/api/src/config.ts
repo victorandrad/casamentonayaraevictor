@@ -48,7 +48,7 @@ export const config = {
     secure: env.SMTP_SECURE === 'true',
     user: env.SMTP_USER ?? '',
     pass: env.SMTP_PASS ?? '',
-    from: env.EMAIL_FROM ?? 'Nayara & Victor <presentes@nayaraevictor.local>',
+    from: env.EMAIL_FROM ?? 'Nayara & Victor <nao-responder@nayaraevictor.local>',
     replyTo: env.EMAIL_REPLY_TO ?? '',
   },
 };

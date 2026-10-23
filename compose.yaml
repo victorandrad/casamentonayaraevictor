@@ -48,7 +48,7 @@ services:
       SMTP_SECURE: ${SMTP_SECURE:-false}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
-      EMAIL_FROM: ${EMAIL_FROM:-Nayara & Victor <presentes@nayaraevictor.local>}
+      EMAIL_FROM: ${EMAIL_FROM:-Nayara & Victor <nao-responder@nayaraevictor.local>}
       EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-}
       # Mailboxes managed from the panel (shared with the mailserver service)
       MAIL_DOMAIN: ${MAIL_DOMAIN:-casamento.localhost}
