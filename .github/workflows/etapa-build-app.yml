@@ -1,0 +1,91 @@
+# Etapa "build-app":
+# - frontend: npm run build:frontend (remotos + shell) com as URLs de produção; os dist vão como
+#   artefato para a etapa build-image;
+# - backend: a API sobe de verdade contra um PostgreSQL (aplicando as migrations) e precisa responder.
+#   A imagem só é gerada se isso passar.
+name: Etapa build-app
+
+on:
+  workflow_call:
+    inputs:
+      parte:
+        description: backend ou frontend
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  SITE_URL: https://casamentonayaraevictor.com.br
+
+jobs:
+  build-app:
+    name: build-app:producao
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      # Imagem vazia = sem banco (o frontend não precisa).
+      db:
+        image: ${{ inputs.parte == 'backend' && 'postgres:17-alpine' || '' }}
+        env:
+          POSTGRES_USER: casamento
+          POSTGRES_PASSWORD: casamento
+          POSTGRES_DB: casamento
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U casamento -d casamento"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/dependencias
+
+      - name: Build dos front-ends (remotos + shell)
+        if: inputs.parte == 'frontend'
+        # O shell carrega o manifest de cada remoto destas URLs (packages/shared/federation.ts).
+        env:
+          MF_SHELL_URL: ${{ env.SITE_URL }}
+          MF_EVENTO_URL: ${{ env.SITE_URL }}/mf/evento
+          MF_RSVP_URL: ${{ env.SITE_URL }}/mf/rsvp
+          MF_PRESENTES_URL: ${{ env.SITE_URL }}/mf/presentes
+          MF_MURAL_URL: ${{ env.SITE_URL }}/mf/mural
+          MF_PAINEL_URL: ${{ env.SITE_URL }}/mf/painel
+        run: npm run build:frontend
+      - name: Guardar os dist para a imagem
+        if: inputs.parte == 'frontend'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-frontend
+          path: |
+            apps/shell/dist
+            apps/evento/dist
+            apps/rsvp/dist
+            apps/presentes/dist
+            apps/mural/dist
+            apps/painel/dist
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: API sobe e responde
+        if: inputs.parte == 'backend'
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgres://casamento:casamento@localhost:5432/casamento
+          PORT: 4100
+          UPLOADS_DIR: /tmp/uploads
+        run: |
+          node src/server.ts > api.log 2>&1 &
+          for _ in $(seq 1 60); do
+            curl -fs -o /dev/null http://127.0.0.1:4100/api/health && break
+            sleep 1
+          done
+          set -x
+          curl -fsS http://127.0.0.1:4100/api/health
+          curl -fsS -o /dev/null http://127.0.0.1:4100/api/public/presentes
+          curl -fsS -o /dev/null http://127.0.0.1:4100/api/public/recados
+          # Rota protegida sem login: 401
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4100/api/admin/resumo)" = 401
+      - name: Log da API
+        if: always() && inputs.parte == 'backend'
+        run: cat apps/api/api.log || true

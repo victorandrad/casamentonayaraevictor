@@ -33,7 +33,7 @@ npm run dev                 # sobe os 6 frontends → http://localhost:4000
 - Site: http://localhost:4000
 - Painel dos noivos: http://localhost:4000/painel (login com `ADMIN_EMAIL` / `ADMIN_PASSWORD` do `.env`)
 
-Outros comandos: `npm run build`, `npm run typecheck`, `npm run docker:logs`, `npm run docker:down`, `npm run db:psql`, `npm run dev:api` (API fora do Docker, usando o Postgres do Docker).
+Outros comandos: `npm run build`, `npm run typecheck`, `npm run lint`, `npm run docker:logs`, `npm run docker:down`, `npm run db:psql`, `npm run dev:api` (API fora do Docker, usando o Postgres do Docker).
 
 ### Contas do painel
 
@@ -113,7 +113,7 @@ O `docker compose up -d` sobe o **Mailpit**, um servidor de e-mail local que rec
 
 ### Produção: servidor de e-mail próprio
 
-O `docker-compose.yml` traz o serviço `mailserver` ([docker-mailserver](https://docker-mailserver.github.io/docker-mailserver/latest/): Postfix + Dovecot + Rspamd com DKIM), desligado por padrão (perfil `email`). Para ele entregar na caixa de entrada (e não no spam) é preciso:
+O `compose.yaml` traz o serviço `mailserver` ([docker-mailserver](https://docker-mailserver.github.io/docker-mailserver/latest/): Postfix + Dovecot + Rspamd com DKIM), desligado por padrão (perfil `email`). Para ele entregar na caixa de entrada (e não no spam) é preciso:
 
 1. **Um VPS com IP fixo e a porta 25 liberada** (muitos provedores bloqueiam a 25 por padrão e liberam sob pedido; internet residencial não serve).
 2. **DNS do domínio**:
@@ -134,7 +134,7 @@ Teste a reputação em https://www.mail-tester.com antes do casamento. Se prefer
 
 ## Deploy (GitHub Actions → VPS)
 
-Produção: **https://casamentonayaraevictor.com.br**, num servidor Linux com Docker. Tudo fica no mesmo domínio:
+Mesmo fluxo do temagua.app: produção em **https://casamentonayaraevictor.com.br**, no VPS da Hostinger, atrás do Traefik do servidor (HTTPS automático). Tudo fica no mesmo domínio:
 
 | Caminho | Serviço |
 | --- | --- |
@@ -142,53 +142,63 @@ Produção: **https://casamentonayaraevictor.com.br**, num servidor Linux com Do
 | `/mf/<app>/` | cada microfrontend (`evento`, `rsvp`, `presentes`, `mural`, `painel`) |
 | `/api/*` | API (container `api`) |
 
-Arquivos:
-- [.github/workflows/ci.yml](.github/workflows/ci.yml): a cada pull request ou push fora da `main`, instala, roda o typecheck e o build.
-- [.github/workflows/deploy.yml](.github/workflows/deploy.yml): a cada push na `main`, roda o CI, monta as imagens `-api` e `-web`, publica no GitHub Container Registry (`ghcr.io/<dono>/<repo>-api|web`, com a tag do commit), envia o compose para o servidor por SSH, atualiza os containers e confere `/api/health`, `/` e um manifest de microfrontend.
-- [deploy/web.Dockerfile](deploy/web.Dockerfile): faz o build do shell e dos remotes já com as URLs de produção (`MF_*_URL`) e serve tudo com o Caddy.
-- [deploy/Caddyfile](deploy/Caddyfile): HTTPS automático (Let's Encrypt), `www` → domínio principal, cache longo para arquivos com hash e `no-cache` para HTML e manifests, cabeçalhos de segurança.
-- [deploy/docker-compose.prod.yml](deploy/docker-compose.prod.yml): `db` (Postgres, sem porta exposta), `api` e `web` (portas 80 e 443).
-- [deploy/.env.production.example](deploy/.env.production.example): modelo do `.env` do servidor.
+### Pipelines
+
+Dois workflows, cada um disparado só quando a sua parte muda na `main` (ou à mão, em *Actions → Run workflow*):
+
+- **Backend** ([backend.yml](.github/workflows/backend.yml)): API → imagem `ghcr.io/victorandrad/casamento-api`.
+- **Frontend** ([frontend.yml](.github/workflows/frontend.yml)): shell e microfrontends → imagem `ghcr.io/victorandrad/casamento-web`.
+
+```
+install ── security ── code-analyzing ── build-app ── build-image ── deploy
+npm ci     osv-scanning  linting         build-app:   build-image:   deploy:producao
+           report-…      typecheck       producao     producao
+                         sonarqube-check
+```
+
+Cada etapa é um workflow reutilizável (`etapa-*.yml`):
+
+| Etapa | O que faz |
+| --- | --- |
+| install | `npm ci` e `node_modules` em cache (as outras etapas só restauram, com [.github/actions/dependencias](.github/actions/dependencias/action.yml)) |
+| security | OSV-Scanner no `package-lock.json`: resultado em *Security → Code scanning* e issues `segurança` por parte, que fecham sozinhas quando a vulnerabilidade some ([issues-seguranca.mjs](.github/scripts/issues-seguranca.mjs)). Não bloqueia o deploy |
+| code-analyzing | ESLint (`npm run lint:backend` / `lint:frontend`), TypeScript (`typecheck:backend` / `typecheck:frontend`) e um SonarQube temporário que vira issues `sonarqube` ([issues-sonarqube.mjs](.github/scripts/issues-sonarqube.mjs)); o SonarQube não bloqueia |
+| build-app | frontend: `npm run build:frontend` com as URLs de produção, e os `dist` vão como artefato; backend: a API sobe contra um PostgreSQL (com as migrations) e precisa responder |
+| build-image | publica a imagem no GitHub Container Registry com a tag do commit e `latest` ([docker/api.Dockerfile](docker/api.Dockerfile), [docker/web.dist.Dockerfile](docker/web.dist.Dockerfile)) |
+| deploy | SSH no VPS ([deploy-vps.yml](.github/workflows/deploy-vps.yml)): a chave só pode rodar o `casamento-deploy`, que baixa a imagem daquele commit e troca só aquele container; depois confere a home e `/api/health` ou o manifest de um microfrontend. Sem o secret `VPS_SSH_KEY`, é pulado com um aviso |
+
+O VPS não tem o código nem compila nada: em `/opt/casamento` ficam só o `.env`, o [compose.yaml](compose.yaml) e o [compose.producao.yaml](compose.producao.yaml) (que o deploy atualiza a cada commit). O Nginx da imagem web ([docker/nginx.conf](docker/nginx.conf)) serve os arquivos e repassa `/api` para a API.
 
 ### Preparar o servidor (uma vez)
 
-1. **DNS:** registros `A` de `casamentonayaraevictor.com.br` e `www` apontando para o IP do servidor (e `AAAA` se houver IPv6).
-2. **Docker:** instale o Docker Engine com o plugin compose (`curl -fsSL https://get.docker.com | sh`). Libere as portas 80 e 443 no firewall.
-3. **Usuário de deploy:** crie um usuário (ex.: `deploy`) no grupo `docker` e gere um par de chaves só para o GitHub:
+1. **DNS:** registros `A` de `casamentonayaraevictor.com.br` e `www` apontando para `177.7.36.12`.
+2. **Pasta e segredos:** crie `/opt/casamento/.env` a partir de [docker/.env.producao.example](docker/.env.producao.example) (senha do banco, conta do painel, Stripe **live**, SMTP). Esse arquivo só existe no servidor.
+3. **Script de deploy:** copie [docker/deploy-vps.sh](docker/deploy-vps.sh) para `/usr/local/bin/casamento-deploy` (`chmod 755`).
+4. **Chave do GitHub Actions**, só para este projeto:
    ```bash
-   ssh-keygen -t ed25519 -f deploy_casamento -C github-actions -N ""
+   ssh-keygen -t ed25519 -f casamento-deploy -C github-actions-deploy@casamento -N ""
    ```
-   Coloque `deploy_casamento.pub` em `~deploy/.ssh/authorized_keys` no servidor.
-4. **Pasta e segredos:** crie `/opt/casamento` (dono `deploy`) e copie `deploy/.env.production.example` para `/opt/casamento/.env`, preenchendo senha do banco, conta do painel, Stripe **live**, SMTP e `ACME_EMAIL`. Esse arquivo só existe no servidor.
-
-### Configurar o GitHub (uma vez)
-
-Em *Settings → Secrets and variables → Actions*:
-
-| Tipo | Nome | Valor |
-| --- | --- | --- |
-| Secret | `VPS_HOST` | IP ou nome do servidor |
-| Secret | `VPS_USER` | `deploy` |
-| Secret | `VPS_SSH_KEY` | conteúdo da chave privada `deploy_casamento` |
-| Secret | `VPS_KNOWN_HOSTS` | saída de `ssh-keyscan -H IP_DO_SERVIDOR` |
-| Variable (opcional) | `VPS_PORT` | porta SSH, se não for 22 |
-| Variable (opcional) | `DEPLOY_PATH` | pasta no servidor, se não for `/opt/casamento` |
-
-Em *Settings → Environments*, crie o ambiente `production` (dá para exigir aprovação antes de cada deploy). As imagens usam o `GITHUB_TOKEN` do próprio workflow, sem token extra.
-
-### Primeiro deploy
-
-1. Faça push na `main` (ou rode *Actions → Deploy → Run workflow*).
-2. Crie a conta do painel no servidor:
+   No servidor, adicione a pública em `/root/.ssh/authorized_keys` presa ao script:
+   ```
+   restrict,command="/usr/local/bin/casamento-deploy" ssh-ed25519 AAAA... github-actions-deploy@casamento
+   ```
+   No GitHub, a privada vai no secret `VPS_SSH_KEY` (*Settings → Secrets and variables → Actions*). Crie também o ambiente `producao` em *Settings → Environments*.
+5. **Primeira subida e Traefik:** rode `casamento-deploy tudo` no servidor (cria a rede `casamento-nv_default` e sobe banco, API e site) e ligue o Traefik a ela, como no temagua:
    ```bash
-   cd /opt/casamento && docker compose -f docker-compose.prod.yml --env-file .env --env-file imagens.env exec api node src/seed.ts
+   docker network connect casamento-nv_default <container-do-traefik>
+   ```
+6. **Conta do painel:**
+   ```bash
+   cd /opt/casamento && docker compose -f compose.yaml -f compose.producao.yaml exec api node src/seed.ts
    ```
    Em produção o seed só cria/atualiza o login; não cadastra conteúdo de exemplo.
-3. No Stripe (modo live), crie o webhook `https://casamentonayaraevictor.com.br/api/stripe/webhook` (eventos na seção do Stripe acima), coloque o `whsec_...` em `STRIPE_WEBHOOK_SECRET` no `.env` do servidor e rode o deploy de novo.
+7. **Stripe:** crie o webhook `https://casamentonayaraevictor.com.br/api/stripe/webhook` (modo live, eventos na seção do Stripe acima), coloque o `whsec_...` em `STRIPE_WEBHOOK_SECRET` no `.env` e rode `casamento-deploy backend`.
 
-**Voltar uma versão:** *Actions → Deploy → Run workflow* com o SHA de um commit já publicado no campo `versao`; as imagens daquele commit são reaproveitadas.
+**Voltar uma versão:** no servidor, `casamento-deploy backend <commit>` ou `casamento-deploy frontend <commit>` com o SHA de um commit já publicado.
 
-**Backup do banco:** `docker compose -f docker-compose.prod.yml --env-file .env --env-file imagens.env exec -T db pg_dump -U casamento casamento > backup.sql`. As fotos ficam no volume `casamento-nv_uploads-data`.
+**Backup do banco:** `docker compose -f compose.yaml -f compose.producao.yaml exec -T db pg_dump -U casamento casamento > backup.sql`. As fotos ficam no volume `casamento-nv_uploads-data`.
+
+**Site completo localmente** (igual à produção, com Nginx): `docker compose --profile site up -d --build` → http://localhost:8088.
 
 ## Links especiais
 
@@ -201,4 +211,4 @@ Em *Settings → Environments*, crie o ambiente `production` (dá para exigir ap
 
 - Fotos da galeria ainda são placeholders (as dos presentes já são enviadas pelo painel).
 - Stripe: falta informar as chaves (teste e depois produção) e ativar as formas de pagamento desejadas no Dashboard.
-- Deploy: workflows prontos; falta subir o repositório no GitHub, preparar o servidor e cadastrar os segredos (seção Deploy).
+- Deploy: pipelines prontos; falta preparar o servidor e cadastrar o secret `VPS_SSH_KEY` (seção Deploy).

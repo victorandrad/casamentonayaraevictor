@@ -26,7 +26,7 @@ export async function migrate(log: (msg: string) => void = console.log) {
         await client.query('INSERT INTO schema_migrations (nome) VALUES ($1)', [file]);
         log(`migration aplicada: ${file}`);
       } catch (error) {
-        throw new Error(`falha na migration ${file}: ${(error as Error).message}`);
+        throw new Error(`falha na migration ${file}: ${(error as Error).message}`, { cause: error });
       }
     }
   });

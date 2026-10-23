@@ -1,6 +1,5 @@
-# Production web image: builds the shell and every microfrontend, then serves
-# them with Caddy on one domain (remotes under /mf/<app>/).
-#   docker build -f deploy/web.Dockerfile --build-arg SITE_URL=https://casamentonayaraevictor.com.br .
+# Site completo compilado dentro do Docker, para o "docker compose --profile site up --build" local.
+# Em produção o CI faz o build uma vez e publica o docker/web.dist.Dockerfile.
 FROM node:24-alpine AS build
 WORKDIR /app
 
@@ -26,21 +25,25 @@ COPY apps/presentes apps/presentes
 COPY apps/mural apps/mural
 COPY apps/painel apps/painel
 
-# The shell loads each remote's manifest from these URLs (see packages/shared/federation.ts).
-ARG SITE_URL=https://casamentonayaraevictor.com.br
+# O shell carrega o manifest de cada remoto destas URLs (packages/shared/federation.ts).
+ARG SITE_URL=http://localhost:8088
 ENV MF_SHELL_URL=${SITE_URL} \
     MF_EVENTO_URL=${SITE_URL}/mf/evento \
     MF_RSVP_URL=${SITE_URL}/mf/rsvp \
     MF_PRESENTES_URL=${SITE_URL}/mf/presentes \
     MF_MURAL_URL=${SITE_URL}/mf/mural \
     MF_PAINEL_URL=${SITE_URL}/mf/painel
+RUN npm run build:frontend
 
-RUN for app in shell evento rsvp presentes mural painel; do npm run build -w @nv/$app || exit 1; done \
-  && mkdir -p /out/mf \
-  && cp -r apps/shell/dist/. /out/ \
-  && for app in evento rsvp presentes mural painel; do mkdir -p /out/mf/$app && cp -r apps/$app/dist/. /out/mf/$app/; done \
-  && find /out -name 'mf-stats.json' -delete
+FROM nginx:1.30-alpine
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/apps/shell/dist /usr/share/nginx/html
+COPY --from=build /app/apps/evento/dist /usr/share/nginx/html/mf/evento
+COPY --from=build /app/apps/rsvp/dist /usr/share/nginx/html/mf/rsvp
+COPY --from=build /app/apps/presentes/dist /usr/share/nginx/html/mf/presentes
+COPY --from=build /app/apps/mural/dist /usr/share/nginx/html/mf/mural
+COPY --from=build /app/apps/painel/dist /usr/share/nginx/html/mf/painel
+RUN find /usr/share/nginx/html -name 'mf-stats.json' -delete
 
-FROM caddy:2.10-alpine
-COPY deploy/Caddyfile /etc/caddy/Caddyfile
-COPY --from=build /out /srv
+EXPOSE 80
+HEALTHCHECK --interval=15s --timeout=3s --retries=3 CMD wget -qO /dev/null http://127.0.0.1/healthz || exit 1

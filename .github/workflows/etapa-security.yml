@@ -1,0 +1,87 @@
+# Etapa "security": procura vulnerabilidades conhecidas nas dependências (base OSV.dev, a mesma do
+# Dependabot e do npm audit) e publica o resultado na aba Security → Code scanning, no resumo do run e
+# em issues da parte que chamou (backend ou frontend): uma por vulnerabilidade e parte, fechada sozinha
+# quando ela some da varredura (.github/scripts/issues-seguranca.mjs).
+# Não bloqueia o deploy: vulnerabilidade em dependência indireta muitas vezes ainda não tem correção.
+name: Etapa security
+
+on:
+  workflow_call:
+    inputs:
+      parte:
+        description: backend ou frontend (de quem são as issues que esta execução abre e fecha)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  osv-scanning:
+    name: osv-scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Varredura do package-lock (OSV)
+        uses: google/osv-scanner-action/osv-scanner-action@v2.7.0
+        # Sai com código 1 quando acha vulnerabilidade; quem trata o resultado é o próximo job.
+        continue-on-error: true
+        with:
+          scan-args: |-
+            --format=sarif
+            --output=osv.sarif
+            --lockfile=package-lock.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: osv-sarif
+          path: osv.sarif
+          if-no-files-found: error
+          retention-days: 7
+
+  report-security-issues:
+    name: report-security-issues
+    needs: osv-scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+      issues: write
+    # Backend e frontend rodam no mesmo push e dividem as issues das ferramentas da raiz: um por vez.
+    concurrency:
+      group: seguranca-issues
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      # node_modules da etapa install: o npm ls diz de que parte do monorepo vem cada pacote vulnerável.
+      - uses: ./.github/actions/dependencias
+      - uses: actions/download-artifact@v4
+        with:
+          name: osv-sarif
+      - name: Publicar em Security → Code scanning
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: osv.sarif
+          category: osv-scanner
+      - name: Resumo e avisos no run
+        run: |
+          total=$(jq '[.runs[].results[]] | length' osv.sarif)
+          {
+            echo "## 🔒 Dependências (OSV)"
+            if [ "$total" -eq 0 ]; then
+              echo "Nenhuma vulnerabilidade conhecida no \`package-lock.json\`. ✅"
+            else
+              echo "**$total** alerta(s) no monorepo — detalhes em *Security → Code scanning* e nas issues com o label \`segurança\`."
+              echo
+              echo "| Vulnerabilidade | Detalhe |"
+              echo "|---|---|"
+              jq -r '.runs[].results[] | "| \(.ruleId) | \(.message.text | split("\n")[0] | .[0:160]) |"' osv.sarif
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.runs[].results[] | "::warning title=\(.ruleId)::\(.message.text | split("\n")[0])"' osv.sarif
+      - name: Issues de segurança (${{ inputs.parte }})
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node .github/scripts/issues-seguranca.mjs "${{ inputs.parte }}" osv.sarif

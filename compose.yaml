@@ -1,3 +1,10 @@
+# Site do casamento em containers.
+#
+#   docker compose up -d --build                  → banco, API e Mailpit (os front-ends rodam no npm run dev)
+#   docker compose --profile site up -d --build   → + o site completo no Nginx: http://localhost:8088
+#   docker compose --profile stripe up -d         → + Stripe CLI repassando os webhooks de teste
+#
+# Produção (VPS): este arquivo + compose.producao.yaml (veja a seção Deploy do README).
 name: casamento-nv
 
 services:
@@ -21,7 +28,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: docker/api.Dockerfile
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-development}
@@ -52,6 +59,23 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_started
+
+  # The whole site as in production: shell and microfrontends built into Nginx,
+  # which also forwards /api. Built locally here; production pulls the image
+  # built by the Frontend workflow (docker/web.dist.Dockerfile).
+  web:
+    profiles: ["site"]
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        SITE_URL: http://localhost:${WEB_PORT:-8088}
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8088}:80"
+    depends_on:
+      api:
+        condition: service_healthy
 
   # Own mail server for development: receives every e-mail the API sends and
   # shows it at http://localhost:8025 (nothing leaves the machine).

@@ -1,0 +1,20 @@
+# Node 24 + node_modules que a etapa "install" (npm ci) deixou no cache. Não instala nada: se o cache
+# não existir, o job falha (a etapa install roda antes de todas).
+name: Dependências (do npm ci da etapa install)
+description: Prepara o Node e restaura o node_modules do monorepo
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24
+    - name: node_modules da etapa install
+      uses: actions/cache/restore@v4
+      with:
+        key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+        fail-on-cache-miss: true
+        path: |
+          node_modules
+          apps/*/node_modules
+          packages/*/node_modules

@@ -1,0 +1,100 @@
+# Frontend (shell e microfrontends React com Module Federation, servidos pelo Nginx).
+#
+#   install ── security ── code-analyzing ── build-app ── build-image ── deploy
+#   npm ci      osv-scanning  linting          build-app:   build-image:   deploy:producao
+#               report-…      typecheck        producao     producao
+#                             sonarqube-check
+#
+# Cada etapa é um workflow reutilizável (etapa-*.yml): o GitHub desenha cada uma como uma caixa com
+# os jobs dentro. O build é feito uma vez só: os dist viram a imagem ghcr.io/victorandrad/casamento-web
+# (docker/web.dist.Dockerfile, só copia os dist para o Nginx) e o VPS apenas a baixa.
+name: Frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/shell/**'
+      - 'apps/evento/**'
+      - 'apps/rsvp/**'
+      - 'apps/presentes/**'
+      - 'apps/mural/**'
+      - 'apps/painel/**'
+      - 'packages/shared/**'
+      - 'docker/web.dist.Dockerfile*'
+      - 'docker/nginx.conf'
+      - 'tsconfig.base.json'
+      - 'eslint.config.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'compose.yaml'
+      - 'compose.producao.yaml'
+      - '.github/workflows/frontend.yml'
+      - '.github/workflows/etapa-*.yml'
+      - '.github/workflows/deploy-vps.yml'
+      - '.github/actions/**'
+  workflow_dispatch:
+
+# Um por vez; um push novo espera o anterior terminar em vez de cancelá-lo no meio.
+concurrency:
+  group: frontend
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: install
+    uses: ./.github/workflows/etapa-install.yml
+
+  security:
+    name: security
+    needs: install
+    permissions:
+      contents: read
+      security-events: write
+      issues: write
+    uses: ./.github/workflows/etapa-security.yml
+    with:
+      parte: frontend
+
+  code-analyzing:
+    name: code-analyzing
+    needs: security
+    # issues: write para o sonarqube-check abrir as issues da análise.
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/etapa-code-analyzing.yml
+    with:
+      parte: frontend
+
+  build-app:
+    name: build-app
+    needs: code-analyzing
+    uses: ./.github/workflows/etapa-build-app.yml
+    with:
+      parte: frontend
+
+  build-image:
+    name: build-image
+    needs: build-app
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/etapa-build-image.yml
+    with:
+      parte: frontend
+
+  deploy:
+    name: deploy
+    needs: build-image
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/deploy-vps.yml
+    with:
+      parte: frontend
+      conferir: /mf/presentes/mf-manifest.json
+    secrets: inherit

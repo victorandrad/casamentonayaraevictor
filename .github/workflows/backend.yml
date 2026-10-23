@@ -1,0 +1,97 @@
+# Backend (API Node + PostgreSQL).
+#
+#   install ── security ── code-analyzing ── build-app ── build-image ── deploy
+#   npm ci      osv-scanning  linting          build-app:   build-image:   deploy:producao
+#               report-…      typecheck        producao     producao
+#                             sonarqube-check
+#
+# Cada etapa é um workflow reutilizável (etapa-*.yml): o GitHub desenha cada uma como uma caixa com
+# os jobs dentro. No build-app a API sobe contra um PostgreSQL e precisa responder; a imagem
+# ghcr.io/victorandrad/casamento-api é gerada uma vez só e o VPS apenas a baixa.
+name: Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'docker/api.Dockerfile'
+      # A API usa estes arquivos do shared (contrato, taxas, categorias, dados do casamento).
+      - 'packages/shared/src/types.ts'
+      - 'packages/shared/src/taxas.ts'
+      - 'packages/shared/src/categorias.ts'
+      - 'packages/shared/src/config.ts'
+      - 'eslint.config.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'compose.yaml'
+      - 'compose.producao.yaml'
+      - '.github/workflows/backend.yml'
+      - '.github/workflows/etapa-*.yml'
+      - '.github/workflows/deploy-vps.yml'
+      - '.github/actions/**'
+  workflow_dispatch:
+
+# Um por vez; um push novo espera o anterior terminar em vez de cancelá-lo no meio.
+concurrency:
+  group: backend
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: install
+    uses: ./.github/workflows/etapa-install.yml
+
+  security:
+    name: security
+    needs: install
+    permissions:
+      contents: read
+      security-events: write
+      issues: write
+    uses: ./.github/workflows/etapa-security.yml
+    with:
+      parte: backend
+
+  code-analyzing:
+    name: code-analyzing
+    needs: security
+    # issues: write para o sonarqube-check abrir as issues da análise.
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/etapa-code-analyzing.yml
+    with:
+      parte: backend
+
+  build-app:
+    name: build-app
+    needs: code-analyzing
+    uses: ./.github/workflows/etapa-build-app.yml
+    with:
+      parte: backend
+
+  build-image:
+    name: build-image
+    needs: build-app
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/etapa-build-image.yml
+    with:
+      parte: backend
+
+  deploy:
+    name: deploy
+    needs: build-image
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/deploy-vps.yml
+    with:
+      parte: backend
+      conferir: /api/health
+    secrets: inherit

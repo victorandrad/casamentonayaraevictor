@@ -9,8 +9,14 @@
     "dev": "concurrently -k -n shell,evento,rsvp,presentes,mural,painel -c magenta,blue,green,yellow,cyan,red \"npm:dev -w @nv/shell\" \"npm:dev -w @nv/evento\" \"npm:dev -w @nv/rsvp\" \"npm:dev -w @nv/presentes\" \"npm:dev -w @nv/mural\" \"npm:dev -w @nv/painel\"",
     "dev:api": "npm run dev -w @nv/api",
     "build": "npm run build --workspaces --if-present",
+    "build:frontend": "npm run build -w @nv/evento && npm run build -w @nv/rsvp && npm run build -w @nv/presentes && npm run build -w @nv/mural && npm run build -w @nv/painel && npm run build -w @nv/shell",
     "preview": "concurrently -k -n shell,evento,rsvp,presentes,mural,painel \"npm:preview -w @nv/shell\" \"npm:preview -w @nv/evento\" \"npm:preview -w @nv/rsvp\" \"npm:preview -w @nv/presentes\" \"npm:preview -w @nv/mural\" \"npm:preview -w @nv/painel\"",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck:backend": "npm run typecheck -w @nv/api",
+    "typecheck:frontend": "npm run typecheck -w @nv/shell && npm run typecheck -w @nv/evento && npm run typecheck -w @nv/rsvp && npm run typecheck -w @nv/presentes && npm run typecheck -w @nv/mural && npm run typecheck -w @nv/painel",
+    "lint": "eslint .",
+    "lint:backend": "eslint apps/api",
+    "lint:frontend": "eslint apps/shell apps/evento apps/rsvp apps/presentes apps/mural apps/painel packages/shared",
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f api",
@@ -18,6 +24,11 @@
     "db:psql": "docker compose exec db psql -U casamento -d casamento"
   },
   "devDependencies": {
-    "concurrently": "^10.0.6"
+    "@eslint/js": "^10.0.1",
+    "concurrently": "^10.0.6",
+    "eslint": "^10.13.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^16.5.0",
+    "typescript-eslint": "^8.72.0"
   }
 }

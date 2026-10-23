@@ -1,0 +1,74 @@
+# Deploy no VPS da Hostinger, reutilizado pelos workflows "Backend" e "Frontend".
+#
+# SSH com a chave do secret VPS_SSH_KEY. No servidor essa chave só pode rodar
+# /usr/local/bin/casamento-deploy (docker/deploy-vps.sh), que recebe "backend <commit>" ou
+# "frontend <commit>", baixa a imagem já construída na etapa build-image (ghcr.io) e troca só aquele
+# container. O VPS não tem o código: pela entrada do SSH vão o token do registro (o GITHUB_TOKEN deste
+# job, packages: read, que expira no fim dele) e os dois arquivos de compose do commit (tar.gz em base64).
+# Sem o secret VPS_SSH_KEY, o deploy é pulado com um aviso.
+name: Deploy no VPS
+
+on:
+  workflow_call:
+    inputs:
+      parte:
+        description: backend ou frontend
+        required: true
+        type: string
+      conferir:
+        description: 'Caminho que precisa responder 200 depois do deploy, por exemplo /api/health'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  VPS_HOST: 177.7.36.12
+  # Chave pública do servidor (a mesma de ssh-keyscan): impede conectar num servidor falso.
+  VPS_HOST_KEY: '177.7.36.12 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBsChjHuKY4GumYOg5hT3UOu3kAYm1HC1w44iX/Wia/6'
+  SITE: https://casamentonayaraevictor.com.br
+
+jobs:
+  deploy:
+    name: deploy:producao
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: producao
+      url: https://casamentonayaraevictor.com.br
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            compose.yaml
+            compose.producao.yaml
+          sparse-checkout-cone-mode: false
+      - name: Deploy por SSH
+        id: deploy
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          PARTE: ${{ inputs.parte }}
+          COMMIT: ${{ github.sha }}
+          REGISTRO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$SSH_KEY" ]; then
+            echo "::warning::Secret VPS_SSH_KEY não configurado: deploy pulado."
+            exit 0
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$VPS_HOST_KEY" > ~/.ssh/known_hosts
+          # O servidor só aceita "<backend|frontend|tudo> [commit]" (restrict,command=...).
+          { printf '%s\n' "$REGISTRO_TOKEN"; tar -czf - compose.yaml compose.producao.yaml | base64 -w0; echo; } |
+            ssh -i ~/.ssh/deploy -o BatchMode=yes -o StrictHostKeyChecking=yes "root@$VPS_HOST" "$PARTE $COMMIT"
+          echo "feito=true" >> "$GITHUB_OUTPUT"
+
+      - name: Conferir o site
+        if: steps.deploy.outputs.feito == 'true'
+        env:
+          CAMINHO: ${{ inputs.conferir }}
+        run: |
+          curl -fsS --retry 5 --retry-delay 5 --retry-all-errors -o /dev/null -w "home %{http_code}\n" "$SITE/"
+          curl -fsS --retry 5 --retry-delay 5 --retry-all-errors -o /dev/null -w "$CAMINHO %{http_code}\n" "$SITE$CAMINHO"

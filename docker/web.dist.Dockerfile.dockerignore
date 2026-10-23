@@ -1,0 +1,16 @@
+# Contexto do web.dist.Dockerfile: só a config do Nginx e os dist do build (o .dockerignore
+# geral exclui os dist, por isso este arquivo próprio).
+**
+!docker/nginx.conf
+!apps/shell/dist
+!apps/shell/dist/**
+!apps/evento/dist
+!apps/evento/dist/**
+!apps/rsvp/dist
+!apps/rsvp/dist/**
+!apps/presentes/dist
+!apps/presentes/dist/**
+!apps/mural/dist
+!apps/mural/dist/**
+!apps/painel/dist
+!apps/painel/dist/**

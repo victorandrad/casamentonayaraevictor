@@ -1,0 +1,36 @@
+# Etapa "install": a primeira de todas. npm ci do monorepo e node_modules no cache
+# (chave = hash do package-lock.json); as etapas seguintes só restauram, sem instalar de novo.
+# Com o lock igual ao do cache, o npm ci não precisa rodar outra vez.
+name: Etapa install
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  npm-ci:
+    name: npm ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: node_modules em cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+      - name: npm ci
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: npm ci
+      - name: Dependências já instaladas para este package-lock
+        if: steps.cache.outputs.cache-hit == 'true'
+        run: echo "node_modules restaurado do cache (package-lock sem mudança)." >> "$GITHUB_STEP_SUMMARY"

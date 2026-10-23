@@ -27,7 +27,7 @@ const SESSAO_PENDENTE = 'nv_sessao_stripe_pendente';
 // The guest came back without paying (cancelled, or the browser's back button):
 // release the gifts that checkout reserved. `exceto` is a session that was paid.
 export async function cancelarPagamentoPendente(exceto?: string): Promise<boolean> {
-  let sessao: string | null = null;
+  let sessao: string | null;
   try {
     sessao = sessionStorage.getItem(SESSAO_PENDENTE);
     sessionStorage.removeItem(SESSAO_PENDENTE);

@@ -5,4 +5,4 @@
 design
 .env
 .github
-deploy/.env*
+docker/.env*

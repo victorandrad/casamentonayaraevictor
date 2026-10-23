@@ -18,11 +18,12 @@ COPY packages/shared/src/categorias.ts packages/shared/src/categorias.ts
 COPY apps/api/src apps/api/src
 COPY apps/api/migrations apps/api/migrations
 
-# Uploaded gift photos live here (mounted as a volume by docker-compose)
+# Uploaded gift photos live here (mounted as a volume by compose.yaml)
 RUN mkdir -p /app/uploads && chown node:node /app/uploads
 ENV UPLOADS_DIR=/app/uploads
 
 WORKDIR /app/apps/api
 USER node
 EXPOSE 4100
+HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=3 CMD wget -qO /dev/null http://127.0.0.1:4100/api/health || exit 1
 CMD ["node", "src/server.ts"]

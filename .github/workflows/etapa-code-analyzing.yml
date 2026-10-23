@@ -1,0 +1,98 @@
+# Etapa "code-analyzing": ESLint e verificação de tipos da parte (backend ou frontend).
+name: Etapa code-analyzing
+
+on:
+  workflow_call:
+    inputs:
+      parte:
+        description: backend ou frontend
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  linting:
+    name: linting
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/dependencias
+      - name: ESLint (${{ inputs.parte }})
+        run: npm run lint:${{ inputs.parte }}
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/dependencias
+      - name: TypeScript (${{ inputs.parte == 'backend' && 'API' || 'shell e microfrontends' }})
+        run: npm run typecheck:${{ inputs.parte }}
+
+  # SonarQube Community Build temporário: sobe dentro do job, analisa a parte e vira issues no GitHub
+  # (.github/scripts/issues-sonarqube.mjs). Sem servidor nem conta fora daqui; nada fica guardado entre
+  # execuções além das issues. Não bloqueia o deploy (continue-on-error): o resultado fica no run e nas issues.
+  sonarqube-check:
+    name: sonarqube-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    continue-on-error: true
+    permissions:
+      contents: read
+      issues: write
+    env:
+      SONAR_HOST_URL: http://localhost:9000
+      PROJETO: casamento-${{ inputs.parte }}
+    steps:
+      - uses: actions/checkout@v4
+      # node_modules: a análise de TypeScript usa os tipos das dependências.
+      - uses: ./.github/actions/dependencias
+      - name: Subir o SonarQube Community Build
+        run: |
+          # Sem as verificações de produção do Elasticsearch (vm.max_map_count), que o runner não atende.
+          docker run -d --name sonarqube -p 9000:9000 -e SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true \
+            sonarqube:26.10.0.133078-community
+          status=""
+          for _ in $(seq 1 90); do
+            status=$(curl -fs "$SONAR_HOST_URL/api/system/status" | jq -r .status 2>/dev/null || true)
+            [ "$status" = UP ] && break
+            sleep 4
+          done
+          if [ "$status" != UP ]; then docker logs sonarqube | tail -60; exit 1; fi
+          # Servidor descartável: troca a senha padrão por uma aleatória e gera o token da análise.
+          senha="Ci-$(openssl rand -hex 12)-Aa1!"
+          curl -fsS -u admin:admin -X POST "$SONAR_HOST_URL/api/users/change_password" \
+            --data-urlencode login=admin --data-urlencode previousPassword=admin --data-urlencode "password=$senha"
+          token=$(curl -fsS -u "admin:$senha" -X POST "$SONAR_HOST_URL/api/user_tokens/generate" --data-urlencode name=ci | jq -r .token)
+          echo "::add-mask::$token"
+          echo "SONAR_TOKEN=$token" >> "$GITHUB_ENV"
+      - name: Análise (${{ inputs.parte }})
+        uses: SonarSource/sonarqube-scan-action@v8.3.0
+        with:
+          args: >
+            -Dsonar.projectKey=${{ env.PROJETO }}
+            -Dsonar.projectName=${{ env.PROJETO }}
+            -Dsonar.sources=${{ inputs.parte == 'backend' && 'apps/api/src,apps/api/migrations' || 'apps/shell/src,apps/evento/src,apps/rsvp/src,apps/presentes/src,apps/mural/src,apps/painel/src,packages/shared/src' }}
+            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/*.json
+            -Dsonar.scm.disabled=true
+      - name: Esperar o SonarQube processar a análise
+        run: |
+          tarefa=$(grep '^ceTaskUrl=' .scannerwork/report-task.txt | cut -d= -f2-)
+          for _ in $(seq 1 100); do
+            estado=$(curl -fs -H "Authorization: Bearer $SONAR_TOKEN" "$tarefa" | jq -r .task.status)
+            case "$estado" in
+              SUCCESS) exit 0 ;;
+              FAILED|CANCELED) echo "Processamento: $estado"; exit 1 ;;
+            esac
+            sleep 3
+          done
+          echo "O SonarQube não terminou de processar a tempo"; exit 1
+      - name: Issues do SonarQube (${{ inputs.parte }})
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node .github/scripts/issues-sonarqube.mjs "${{ inputs.parte }}" "$PROJETO"

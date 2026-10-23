@@ -1,0 +1,49 @@
+# Produção no VPS, atrás do Traefik do servidor (HTTPS automático com Let's Encrypt).
+#
+#   docker compose -f compose.yaml -f compose.producao.yaml pull api web
+#   docker compose -f compose.yaml -f compose.producao.yaml up -d --no-build
+#
+# As imagens vêm prontas do registro do GitHub (build feito uma vez no CI): o VPS não compila nada.
+# API_TAG/WEB_TAG = commit publicado (o casamento-deploy grava no .env a cada deploy).
+# Variáveis em .env (fora do git): DOMINIO, POSTGRES_PASSWORD, ADMIN_*, STRIPE_*, SMTP_*, EMAIL_*,
+# API_TAG, WEB_TAG. Nenhuma porta aberta no servidor: só o Traefik chega ao web, pela rede
+# casamento-nv_default.
+services:
+  db:
+    ports: !reset []
+
+  # Sem build em produção: o VPS não tem o código (só .env e os dois arquivos de compose).
+  api:
+    build: !reset null
+    image: ghcr.io/victorandrad/casamento-api:${API_TAG:-latest}
+    ports: !reset []
+    environment:
+      NODE_ENV: production
+      ALLOWED_ORIGINS: https://${DOMINIO:?defina DOMINIO no .env}
+      SITE_URL: https://${DOMINIO}
+      COOKIE_SECURE: "true"
+    depends_on: !override
+      db:
+        condition: service_healthy
+
+  web:
+    profiles: !reset []
+    build: !reset null
+    image: ghcr.io/victorandrad/casamento-web:${WEB_TAG:-latest}
+    ports: !reset []
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: casamento-nv_default
+      traefik.http.routers.casamento.rule: Host(`${DOMINIO}`) || Host(`www.${DOMINIO}`)
+      traefik.http.routers.casamento.entrypoints: websecure
+      traefik.http.routers.casamento.tls.certresolver: letsencrypt
+      # www → domínio principal
+      traefik.http.routers.casamento.middlewares: casamento-www
+      traefik.http.middlewares.casamento-www.redirectregex.regex: ^https://www\.(.+)
+      traefik.http.middlewares.casamento-www.redirectregex.replacement: https://$${1}
+      traefik.http.middlewares.casamento-www.redirectregex.permanent: "true"
+      traefik.http.services.casamento.loadbalancer.server.port: "80"
+
+  # Só para desenvolvimento: em produção os e-mails saem pelo SMTP do .env.
+  mailpit:
+    profiles: ["dev"]

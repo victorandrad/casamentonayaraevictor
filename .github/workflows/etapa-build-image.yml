@@ -1,0 +1,45 @@
+# Etapa "build-image": gera a imagem Docker da parte e publica no registro do GitHub (ghcr.io) com a
+# tag do commit e "latest". O VPS só baixa a imagem pronta, não compila nada.
+# - backend:  docker/api.Dockerfile      → ghcr.io/victorandrad/casamento-api
+# - frontend: docker/web.dist.Dockerfile → ghcr.io/victorandrad/casamento-web (só copia os dist da etapa build-app)
+name: Etapa build-image
+
+on:
+  workflow_call:
+    inputs:
+      parte:
+        description: backend ou frontend
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-image:
+    name: build-image:producao
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGEM: ghcr.io/victorandrad/${{ inputs.parte == 'backend' && 'casamento-api' || 'casamento-web' }}
+      DOCKERFILE: docker/${{ inputs.parte == 'backend' && 'api.Dockerfile' || 'web.dist.Dockerfile' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dist da etapa build-app
+        if: inputs.parte == 'frontend'
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-frontend
+          path: apps
+      - name: Login no registro do GitHub
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Imagem e publicação
+        run: |
+          docker build -f "$DOCKERFILE" \
+            --label org.opencontainers.image.source=https://github.com/${{ github.repository }} \
+            -t "$IMAGEM:${{ github.sha }}" -t "$IMAGEM:latest" .
+          docker push "$IMAGEM:${{ github.sha }}"
+          docker push "$IMAGEM:latest"
