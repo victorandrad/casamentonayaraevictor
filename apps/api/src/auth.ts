@@ -29,7 +29,8 @@ export async function verifyPassword(password: string, stored: string): Promise<
   return timingSafeEqual(actual, expected);
 }
 
-const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
+export const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
+export const ehDono = (email: string) => !!config.ownerEmail && email.toLowerCase() === config.ownerEmail;
 
 export async function createSession(usuarioId: number): Promise<{ token: string; expiresAt: Date }> {
   const token = randomBytes(32).toString('base64url');
@@ -50,11 +51,17 @@ export async function destroySession(token: string | undefined) {
 
 export async function userFromSession(token: string | undefined): Promise<Usuario | null> {
   if (!token) return null;
-  return queryOne<Usuario>(
+  const row = await queryOne<Omit<Usuario, 'dono'>>(
     `SELECT u.id, u.email, u.nome FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id
      WHERE s.token_hash = $1 AND s.expira_em > now()`,
     [sha256(token)],
   );
+  return row ? { ...row, dono: ehDono(row.email) } : null;
+}
+
+// Logs out every other device of this user (after a password change).
+export async function destroyOtherSessions(usuarioId: number, tokenAtual: string | undefined) {
+  await query('DELETE FROM sessoes WHERE usuario_id = $1 AND token_hash <> $2', [usuarioId, sha256(tokenAtual ?? '')]);
 }
 
 export function sessionCookieOptions(expires?: Date) {
@@ -78,6 +85,11 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply) 
   const usuario = await userFromSession(request.cookies[SESSION_COOKIE]);
   if (!usuario) return reply.code(401).send({ erro: 'Faça login para continuar.' });
   request.usuario = usuario;
+}
+
+// preHandler for the owner-only routes (user management); runs after requireAuth.
+export async function requireOwner(request: FastifyRequest, reply: FastifyReply) {
+  if (!request.usuario?.dono) return reply.code(403).send({ erro: 'Só o dono do painel pode gerenciar os usuários.' });
 }
 
 // Small in-memory limiter (one API instance is plenty for a wedding site).

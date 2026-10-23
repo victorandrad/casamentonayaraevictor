@@ -2,11 +2,12 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { ICONES_CATEGORIA } from '@nv/shared/categorias';
 import { IDS_MOMENTOS } from '@nv/shared/galeria';
 import type { CategoriaInput, Configuracoes, ConvidadoInput, FotoGaleriaInput, OrganizacaoLista, PresenteInput } from '@nv/shared/types';
-import { requireAuth } from '../auth.ts';
+import { destroyOtherSessions, requireAuth, requireOwner, SESSION_COOKIE } from '../auth.ts';
 import * as repo from '../repo.ts';
 import { enviarReciboDoPedido, listarPedidos } from '../pedidos.ts';
 import { ImagemInvalida, LADO_GALERIA, LADO_PRESENTE, removerImagem, salvarImagem, TIPOS_ACEITOS } from '../uploads.ts';
 import * as emails from '../emails.ts';
+import * as usuarios from '../usuarios.ts';
 
 const idParams = {
   type: 'object',
@@ -81,6 +82,84 @@ export async function adminRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAuth);
 
   app.get('/resumo', async () => repo.resumo());
+
+  // Minha conta (qualquer usuário) e usuários do painel (só o dono)
+  const comErroDeUsuario = async (reply: FastifyReply, fn: () => Promise<unknown>) => {
+    try {
+      return await fn();
+    } catch (error) {
+      if (error instanceof usuarios.ErroUsuario) return reply.code(error.status).send({ erro: error.message });
+      throw error;
+    }
+  };
+
+  app.put<{ Body: { nome: string } }>(
+    '/conta/nome',
+    {
+      schema: {
+        body: { type: 'object', required: ['nome'], additionalProperties: false, properties: { nome: { type: 'string', minLength: 1, maxLength: 80 } } },
+      },
+    },
+    async (req, reply) => comErroDeUsuario(reply, async () => ({ nome: await usuarios.trocarNome(req.usuario!.id, req.body.nome) })),
+  );
+
+  app.put<{ Body: { senhaAtual: string; senhaNova: string } }>(
+    '/conta/senha',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['senhaAtual', 'senhaNova'],
+          additionalProperties: false,
+          properties: {
+            senhaAtual: { type: 'string', minLength: 1, maxLength: 200 },
+            senhaNova: { type: 'string', minLength: usuarios.SENHA_MINIMA, maxLength: 200 },
+          },
+        },
+      },
+    },
+    async (req, reply) =>
+      comErroDeUsuario(reply, async () => {
+        const resultado = await usuarios.trocarSenha(req.usuario!, req.body.senhaAtual, req.body.senhaNova);
+        await destroyOtherSessions(req.usuario!.id, req.cookies[SESSION_COOKIE]);
+        return resultado;
+      }),
+  );
+
+  app.get('/usuarios', { preHandler: requireOwner }, async () => usuarios.listar());
+
+  app.post<{ Body: { email: string; nome: string } }>(
+    '/usuarios',
+    {
+      preHandler: requireOwner,
+      schema: {
+        body: {
+          type: 'object',
+          required: ['email', 'nome'],
+          additionalProperties: false,
+          properties: { email: { type: 'string', minLength: 3, maxLength: 200 }, nome: { type: 'string', minLength: 1, maxLength: 80 } },
+        },
+      },
+    },
+    async (req, reply) =>
+      comErroDeUsuario(reply, async () => reply.code(201).send(await usuarios.convidar(req.body.email, req.body.nome, req.usuario!.nome))),
+  );
+
+  app.post<{ Params: { id: number } }>(
+    '/usuarios/:id/convite',
+    { preHandler: requireOwner, schema: { params: idParams } },
+    async (req, reply) => comErroDeUsuario(reply, async () => usuarios.reenviarConvite(req.params.id, req.usuario!.nome)),
+  );
+
+  app.delete<{ Params: { id: number } }>(
+    '/usuarios/:id',
+    { preHandler: requireOwner, schema: { params: idParams } },
+    async (req, reply) =>
+      comErroDeUsuario(reply, async () => {
+        await usuarios.remover(req.params.id, req.usuario!);
+        return reply.code(204).send();
+      }),
+  );
 
   // Convidados
   app.get('/convidados', async () => repo.listConvidados());

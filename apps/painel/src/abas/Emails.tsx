@@ -335,7 +335,7 @@ export function Emails() {
                       </div>
                       {doPainel && (
                         <div className="painel-item__meta">
-                          <span>Mesma senha do login do painel. Para trocar, mude o secret ADMIN_PASSWORD e rode o deploy do Backend.</span>
+                          <span>Mesma senha do login do painel. Para trocar, use “Minha conta”.</span>
                         </div>
                       )}
                     </div>

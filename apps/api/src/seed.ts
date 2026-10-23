@@ -2,7 +2,7 @@
 // and, outside production, fills empty tables with the example content from the design.
 //   docker compose exec api node src/seed.ts      (inside Docker)
 //   npm run seed -w @nv/api                       (from the host)
-import { hashPassword } from './auth.ts';
+import { hashPassword, verifyPassword } from './auth.ts';
 import { pool, query, queryOne } from './db.ts';
 import { migrate } from './migrate.ts';
 import * as repo from './repo.ts';
@@ -47,6 +47,11 @@ const recados = [
 
 const isEmpty = async (table: string) => !(await queryOne(`SELECT 1 FROM ${table} LIMIT 1`));
 
+// Creates the panel owner from ADMIN_EMAIL/ADMIN_PASSWORD. Afterwards the password (and name) can be
+// changed in the panel ("Minha conta"): the secret is applied again only when it changes, so a deploy
+// never undoes a change made there. A scrypt hash of the last applied secret is kept to tell.
+const CHAVE_SENHA_APLICADA = 'admin_senha_aplicada';
+
 async function seedAdmin() {
   const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   const password = process.env.ADMIN_PASSWORD;
@@ -56,16 +61,27 @@ async function seedAdmin() {
     return;
   }
   if (password.length < 10) throw new Error('ADMIN_PASSWORD precisa ter pelo menos 10 caracteres.');
-  await query(
-    `INSERT INTO usuarios (email, nome, senha_hash) VALUES ($1, $2, $3)
-     ON CONFLICT (email) DO UPDATE SET nome = EXCLUDED.nome, senha_hash = EXCLUDED.senha_hash`,
-    [email, nome, await hashPassword(password)],
-  );
-  console.log(`Conta do painel pronta: ${email}`);
 
-  // Same password for the mailbox with this address (when it is on the mail server's domain).
-  const caixa = await sincronizarCaixaDoPainel(password);
-  if (caixa !== 'ignorada') console.log(`Caixa de e-mail ${email}: ${caixa}`);
+  const existe = await queryOne<{ id: number }>('SELECT id FROM usuarios WHERE email = $1', [email]);
+  const aplicada = await repo.getConfig(CHAVE_SENHA_APLICADA);
+  const secretNovo = !aplicada || !(await verifyPassword(password, aplicada));
+
+  if (!existe) {
+    await query('INSERT INTO usuarios (email, nome, senha_hash) VALUES ($1, $2, $3)', [email, nome, await hashPassword(password)]);
+    console.log(`Conta do painel criada: ${email}`);
+  } else if (secretNovo) {
+    await query('UPDATE usuarios SET senha_hash = $2 WHERE id = $1', [existe.id, await hashPassword(password)]);
+    console.log(`Conta do painel: senha do ADMIN_PASSWORD aplicada (${email})`);
+  } else {
+    console.log(`Conta do painel pronta: ${email} (senha mantida)`);
+  }
+
+  if (!existe || secretNovo) {
+    await repo.setConfig(CHAVE_SENHA_APLICADA, await hashPassword(password));
+    // Same password for the mailbox with this address (when it is on the mail server's domain).
+    const caixa = await sincronizarCaixaDoPainel(password);
+    if (caixa !== 'ignorada') console.log(`Caixa de e-mail ${email}: ${caixa}`);
+  }
 }
 
 async function seedContent() {

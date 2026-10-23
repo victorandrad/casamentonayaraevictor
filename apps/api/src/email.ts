@@ -117,3 +117,87 @@ export async function enviarRecibo(r: EmailRecibo) {
     html,
   });
 }
+
+export type EmailConvite = { nome: string; email: string; convidadoPor: string; link: string; validadeDias: number };
+
+// Invitation to the couple's panel, with the link to create the password.
+export async function enviarConviteUsuario(c: EmailConvite) {
+  const casal = `${casamento.noiva} & ${casamento.noivo}`;
+  const primeiroNome = c.nome.split(' ')[0];
+  const recursos = [
+    ['Convidados', 'confirmações de presença e QR Codes dos convites'],
+    ['Lista de presentes', 'categorias, valores e presentes recebidos'],
+    ['Galeria e recados', 'fotos do site e mensagens do mural'],
+  ];
+
+  const html = `<!doctype html>
+<html lang="pt-BR">
+<body style="margin:0;padding:0;background:#f6f1ea;">
+  <div style="display:none;max-height:0;overflow:hidden;color:#f6f1ea;">${escapar(c.convidadoPor)} convidou você para o painel do casamento de ${escapar(casal)}.</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f1ea;padding:32px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fbf8f3;border:1px solid #e6dccd;border-radius:24px;overflow:hidden;">
+        <tr><td align="center" style="background:#f2e1dc;padding:38px 28px 34px;font-family:Georgia,'Times New Roman',serif;">
+          <div style="font-size:13px;letter-spacing:5px;text-transform:uppercase;color:#a86b64;font-family:Arial,Helvetica,sans-serif;">Painel dos noivos</div>
+          <div style="margin:14px 0 4px;font-size:40px;font-style:italic;color:#43382f;">${escapar(casamento.noiva)} <span style="color:#c58a83;">&amp;</span> ${escapar(casamento.noivo)}</div>
+          <div style="font-size:14px;letter-spacing:3px;color:#8f544e;font-family:Arial,Helvetica,sans-serif;">${escapar(casamento.dataExtenso)}</div>
+        </td></tr>
+        <tr><td align="center" style="padding:36px 36px 8px;font-family:Georgia,'Times New Roman',serif;">
+          <h1 style="margin:0 0 12px;font-weight:normal;font-style:italic;font-size:28px;color:#43382f;">Olá, ${escapar(primeiroNome)}!</h1>
+          <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.7;color:#6b5e52;">
+            <strong style="color:#43382f;">${escapar(c.convidadoPor)}</strong> convidou você para ajudar a cuidar do site do casamento.
+            Crie sua senha para entrar no painel.
+          </p>
+        </td></tr>
+        <tr><td align="center" style="padding:28px 36px 10px;">
+          <a href="${c.link}" style="display:inline-block;background:#c58a83;color:#ffffff;text-decoration:none;font-family:Arial,Helvetica,sans-serif;font-size:14px;letter-spacing:3px;text-transform:uppercase;padding:16px 34px;border-radius:999px;">Criar minha senha</a>
+          <p style="margin:14px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#a88f7e;">O link vale por ${c.validadeDias} dias e só pode ser usado uma vez.</p>
+        </td></tr>
+        <tr><td style="padding:26px 36px 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8eeea;border-radius:16px;">
+            <tr><td style="padding:18px 22px 6px;font-family:Georgia,serif;font-size:17px;font-style:italic;color:#8f544e;">No painel você vai encontrar</td></tr>
+            ${recursos
+              .map(
+                ([titulo, texto]) => `<tr><td style="padding:6px 22px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#6b5e52;">
+              <span style="color:#c58a83;">♥</span>&nbsp; <strong style="color:#43382f;">${titulo}</strong> · ${texto}
+            </td></tr>`,
+              )
+              .join('')}
+            <tr><td style="padding:0 0 14px;"></td></tr>
+          </table>
+        </td></tr>
+        <tr><td style="padding:24px 36px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.7;color:#a88f7e;">
+          Se o botão não funcionar, copie e cole este endereço no navegador:<br>
+          <a href="${c.link}" style="color:#a86b64;word-break:break-all;">${c.link}</a>
+        </td></tr>
+        <tr><td align="center" style="padding:28px 36px 34px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.7;color:#a88f7e;">
+          Com carinho, ${escapar(casal)}<br>
+          Não esperava este convite? É só ignorar este e-mail: nenhuma conta é ativada sem a senha.
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const texto = [
+    `Olá, ${primeiroNome}!`,
+    '',
+    `${c.convidadoPor} convidou você para o painel do casamento de ${casal}.`,
+    'Crie sua senha neste link:',
+    c.link,
+    '',
+    `O link vale por ${c.validadeDias} dias e só pode ser usado uma vez.`,
+    '',
+    `Com carinho, ${casal}`,
+  ].join('\n');
+
+  await transporte.sendMail({
+    from: config.smtp.from,
+    replyTo: config.smtp.replyTo || undefined,
+    to: { name: c.nome, address: c.email },
+    subject: `${c.convidadoPor} convidou você para o painel do casamento de ${casal}`,
+    text: texto,
+    html,
+  });
+}

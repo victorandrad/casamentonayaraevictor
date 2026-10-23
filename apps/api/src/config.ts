@@ -23,6 +23,9 @@ export const config = {
     .filter(Boolean),
   cookieSecure: env.COOKIE_SECURE === 'true',
   sessionDays: 30,
+  // Panel owner (the only one who manages users): the account created from ADMIN_EMAIL.
+  ownerEmail: (env.ADMIN_EMAIL ?? '').trim().toLowerCase(),
+  inviteDays: 7,
   // Public address of the site, used for Stripe's return URLs
   siteUrl: (env.SITE_URL ?? 'http://localhost:4000').replace(/\/$/, ''),
   stripeSecretKey: env.STRIPE_SECRET_KEY ?? '',

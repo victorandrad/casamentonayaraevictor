@@ -111,7 +111,7 @@ export function caixaDoPainel(): string | null {
 function protegerCaixaDoPainel(endereco: string) {
   if (endereco === caixaDoPainel()) {
     throw new ErroEmail(
-      'A senha desta caixa é a mesma do login do painel: troque o secret ADMIN_PASSWORD no GitHub e rode o deploy do Backend.',
+      'A senha desta caixa é a mesma do login do painel: troque em "Minha conta".',
       409,
     );
   }
@@ -223,5 +223,17 @@ export function sincronizarCaixaDoPainel(senha: string): Promise<'criada' | 'atu
     const linha = `${endereco}|${hashDaSenha(senha)}`;
     await gravarLinhas(CONTAS, atual ? contas.map((c) => (c.endereco === endereco ? linha : c.linha)) : [...contas.map((c) => c.linha), linha]);
     return atual ? 'atualizada' : 'criada';
+  });
+}
+
+// Panel password change: a mailbox with the user's address (if there is one) keeps the same password.
+export function atualizarSenhaDaCaixa(endereco: string, senha: string): Promise<boolean> {
+  return emOrdem(async () => {
+    if (!(await disponivel())) return false;
+    const alvo = endereco.trim().toLowerCase();
+    const contas = await lerContas();
+    if (!contas.some((c) => c.endereco === alvo)) return false;
+    await gravarLinhas(CONTAS, contas.map((c) => (c.endereco === alvo ? `${alvo}|${hashDaSenha(senha)}` : c.linha)));
+    return true;
   });
 }

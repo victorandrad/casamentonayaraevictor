@@ -3,6 +3,7 @@ import type { LoginInput, Usuario } from '@nv/shared/types';
 import {
   createSession,
   destroySession,
+  ehDono,
   rateLimiter,
   SESSION_COOKIE,
   sessionCookieOptions,
@@ -10,8 +11,15 @@ import {
   verifyPassword,
 } from '../auth.ts';
 import { queryOne } from '../db.ts';
+import { aceitarConvite, ErroUsuario, lerConvite, SENHA_MINIMA } from '../usuarios.ts';
 
 const loginLimiter = rateLimiter(5, 15 * 60_000);
+const conviteLimiter = rateLimiter(20, 15 * 60_000);
+const tokenParams = {
+  type: 'object',
+  required: ['token'],
+  properties: { token: { type: 'string', minLength: 20, maxLength: 100, pattern: '^[A-Za-z0-9_-]+$' } },
+} as const;
 // Compared against when the e-mail doesn't exist, so timing doesn't reveal accounts.
 const DUMMY_HASH = 'scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$' + Buffer.alloc(64).toString('base64');
 
@@ -38,7 +46,7 @@ export async function authRoutes(app: FastifyInstance) {
         return reply.code(429).send({ erro: 'Muitas tentativas. Aguarde alguns minutos e tente de novo.' });
       }
 
-      const row = await queryOne<Usuario & { senha_hash: string }>(
+      const row = await queryOne<Omit<Usuario, 'dono'> & { senha_hash: string | null }>(
         'SELECT id, email, nome, senha_hash FROM usuarios WHERE email = $1',
         [email],
       );
@@ -48,7 +56,7 @@ export async function authRoutes(app: FastifyInstance) {
       loginLimiter.reset(limitKey);
       const { token, expiresAt } = await createSession(row.id);
       reply.setCookie(SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
-      const usuario: Usuario = { id: row.id, email: row.email, nome: row.nome };
+      const usuario: Usuario = { id: row.id, email: row.email, nome: row.nome, dono: ehDono(row.email) };
       return { usuario };
     },
   );
@@ -58,6 +66,43 @@ export async function authRoutes(app: FastifyInstance) {
     reply.clearCookie(SESSION_COOKIE, sessionCookieOptions());
     return reply.code(204).send();
   });
+
+  // Invite link from the e-mail: who it is for, then create the password (and log in).
+  app.get<{ Params: { token: string } }>('/convite/:token', { schema: { params: tokenParams } }, async (req, reply) => {
+    if (conviteLimiter.hit(req.ip)) return reply.code(429).send({ erro: 'Muitas tentativas. Aguarde alguns minutos.' });
+    try {
+      return await lerConvite(req.params.token);
+    } catch (error) {
+      if (error instanceof ErroUsuario) return reply.code(error.status).send({ erro: error.message });
+      throw error;
+    }
+  });
+
+  app.post<{ Params: { token: string }; Body: { senha: string } }>(
+    '/convite/:token',
+    {
+      schema: {
+        params: tokenParams,
+        body: {
+          type: 'object',
+          required: ['senha'],
+          additionalProperties: false,
+          properties: { senha: { type: 'string', minLength: SENHA_MINIMA, maxLength: 200 } },
+        },
+      },
+    },
+    async (req, reply) => {
+      if (conviteLimiter.hit(req.ip)) return reply.code(429).send({ erro: 'Muitas tentativas. Aguarde alguns minutos.' });
+      try {
+        const { usuario, sessao } = await aceitarConvite(req.params.token, req.body.senha);
+        reply.setCookie(SESSION_COOKIE, sessao.token, sessionCookieOptions(sessao.expiresAt));
+        return { usuario };
+      } catch (error) {
+        if (error instanceof ErroUsuario) return reply.code(error.status).send({ erro: error.message });
+        throw error;
+      }
+    },
+  );
 
   app.get('/me', async (req, reply) => {
     const usuario = await userFromSession(req.cookies[SESSION_COOKIE]);

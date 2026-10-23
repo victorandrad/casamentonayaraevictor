@@ -99,8 +99,8 @@ export function Configuracoes({ usuario }: { usuario: Usuario }) {
       <div className="painel-card painel-narrow">
         <h3 className="painel-h3">Sua conta</h3>
         <p className="painel-hint">
-          Conectado como <strong>{usuario.email}</strong>. Para trocar a senha ou criar o acesso de mais alguém, rode o
-          comando de seed com novas variáveis ADMIN_* (veja o README).
+          Conectado como <strong>{usuario.email}</strong>. Nome, senha
+          {usuario.dono ? ' e os usuários do painel ficam' : ' ficam'} na aba “Minha conta”.
         </p>
       </div>
     </section>

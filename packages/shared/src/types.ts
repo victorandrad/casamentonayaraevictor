@@ -47,7 +47,12 @@ export type Presente = {
 export type ListaPresentes = { categorias: Categoria[]; presentes: Presente[]; taxa: Taxa };
 
 // Auth
-export type Usuario = { id: number; email: string; nome: string };
+// `dono`: the panel owner (ADMIN_EMAIL), the only one who manages the other users.
+export type Usuario = { id: number; email: string; nome: string; dono: boolean };
+// Panel users as the owner sees them; "convidado" = invite sent, password not set yet.
+export type UsuarioPainel = { id: number; email: string; nome: string; status: 'ativo' | 'convidado'; criadoEm: string; dono: boolean };
+export type ConviteEnviado = { usuario: UsuarioPainel; emailEnviado: boolean; link: string };
+export type ConvitePainel = { email: string; nome: string };
 export type LoginInput = { email: string; senha: string };
 
 // Admin
