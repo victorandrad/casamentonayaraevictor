@@ -4,8 +4,13 @@
 # /usr/local/bin/casamento-deploy (docker/deploy-vps.sh), que recebe "backend <commit>" ou
 # "frontend <commit>", baixa a imagem já construída na etapa build-image (ghcr.io) e troca só aquele
 # container. O VPS não tem o código: pela entrada do SSH vão o token do registro (o GITHUB_TOKEN deste
-# job, packages: read, que expira no fim dele) e os dois arquivos de compose do commit (tar.gz em base64).
+# job, packages: read, que expira no fim dele), os dois arquivos de compose do commit (tar.gz em base64)
+# e os secrets/variables de produção abaixo, que o script grava em /opt/casamento/segredos.env.
 # Sem o secret VPS_SSH_KEY, o deploy é pulado com um aviso.
+#
+# Secrets:   VPS_SSH_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SMTP_USER, SMTP_PASS
+# Variables: ADMIN_NOME, SMTP_HOST, SMTP_PORT, SMTP_SECURE, EMAIL_FROM, EMAIL_REPLY_TO
+# Os vazios ficam de fora (a API usa o padrão dela).
 name: Deploy no VPS
 
 on:
@@ -51,6 +56,18 @@ jobs:
           PARTE: ${{ inputs.parte }}
           COMMIT: ${{ github.sha }}
           REGISTRO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          ADMIN_NOME: ${{ vars.ADMIN_NOME }}
+          SMTP_HOST: ${{ vars.SMTP_HOST }}
+          SMTP_PORT: ${{ vars.SMTP_PORT }}
+          SMTP_SECURE: ${{ vars.SMTP_SECURE }}
+          EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+          EMAIL_REPLY_TO: ${{ vars.EMAIL_REPLY_TO }}
         run: |
           if [ -z "$SSH_KEY" ]; then
             echo "::warning::Secret VPS_SSH_KEY não configurado: deploy pulado."
@@ -60,8 +77,16 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy
           chmod 600 ~/.ssh/deploy
           printf '%s\n' "$VPS_HOST_KEY" > ~/.ssh/known_hosts
+          # Terceira linha: NOME=valor-em-base64 de cada valor preenchido, tudo em base64.
+          segredos=$(
+            for nome in ADMIN_EMAIL ADMIN_NOME ADMIN_PASSWORD STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET \
+                        SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASS EMAIL_FROM EMAIL_REPLY_TO; do
+              valor=$(printenv "$nome" || true)
+              [ -n "$valor" ] && printf '%s=%s\n' "$nome" "$(printf '%s' "$valor" | base64 -w0)"
+            done | base64 -w0
+          )
           # O servidor só aceita "<backend|frontend|tudo> [commit]" (restrict,command=...).
-          { printf '%s\n' "$REGISTRO_TOKEN"; tar -czf - compose.yaml compose.producao.yaml | base64 -w0; echo; } |
+          { printf '%s\n' "$REGISTRO_TOKEN"; tar -czf - compose.yaml compose.producao.yaml | base64 -w0; echo; printf '%s\n' "$segredos"; } |
             ssh -i ~/.ssh/deploy -o BatchMode=yes -o StrictHostKeyChecking=yes "root@$VPS_HOST" "$PARTE $COMMIT"
           echo "feito=true" >> "$GITHUB_OUTPUT"
 

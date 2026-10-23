@@ -167,12 +167,27 @@ Cada etapa é um workflow reutilizável (`etapa-*.yml`):
 | build-image | publica a imagem no GitHub Container Registry com a tag do commit e `latest` ([docker/api.Dockerfile](docker/api.Dockerfile), [docker/web.dist.Dockerfile](docker/web.dist.Dockerfile)) |
 | deploy | SSH no VPS ([deploy-vps.yml](.github/workflows/deploy-vps.yml)): a chave só pode rodar o `casamento-deploy`, que baixa a imagem daquele commit e troca só aquele container; depois confere a home e `/api/health` ou o manifest de um microfrontend. Sem o secret `VPS_SSH_KEY`, é pulado com um aviso |
 
-O VPS não tem o código nem compila nada: em `/opt/casamento` ficam só o `.env`, o [compose.yaml](compose.yaml) e o [compose.producao.yaml](compose.producao.yaml) (que o deploy atualiza a cada commit). O Nginx da imagem web ([docker/nginx.conf](docker/nginx.conf)) serve os arquivos e repassa `/api` para a API.
+O VPS não tem o código nem compila nada: em `/opt/casamento` ficam só o `.env` (domínio e banco), o `segredos.env` (gravado pelo deploy), o [compose.yaml](compose.yaml) e o [compose.producao.yaml](compose.producao.yaml) (que o deploy atualiza a cada commit).
+
+### Secrets e variables do GitHub
+
+Em *Settings → Secrets and variables → Actions*. A cada deploy o job manda os preenchidos pelo SSH e o `casamento-deploy` grava em `/opt/casamento/segredos.env` (permissão 600, só os nomes abaixo são aceitos, valores usados como estão). Se algo mudou, a API é recriada e o seed cria/atualiza o login do painel.
+
+| Tipo | Nome | Para quê |
+| --- | --- | --- |
+| Secret | `VPS_SSH_KEY` | chave do deploy (presa ao `casamento-deploy`) |
+| Secret | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | login do painel (senha com 10+ caracteres) |
+| Secret | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe em modo real (`sk_live_…`, `whsec_…`) |
+| Secret | `SMTP_USER`, `SMTP_PASS` | conta do servidor de e-mail dos recibos |
+| Variable | `ADMIN_NOME`, `EMAIL_FROM`, `EMAIL_REPLY_TO` | nome no painel e remetente dos recibos |
+| Variable | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` | servidor de e-mail (ex.: `smtp-relay.brevo.com`, `587`, `false`) |
+
+Mudou um valor? Rode *Actions → Backend → Run workflow* (ou espere o próximo push) para ele chegar ao servidor. O Nginx da imagem web ([docker/nginx.conf](docker/nginx.conf)) serve os arquivos e repassa `/api` para a API.
 
 ### Preparar o servidor (uma vez)
 
 1. **DNS:** registros `A` de `casamentonayaraevictor.com.br` e `www` apontando para `177.7.36.12`.
-2. **Pasta e segredos:** crie `/opt/casamento/.env` a partir de [docker/.env.producao.example](docker/.env.producao.example) (senha do banco, conta do painel, Stripe **live**, SMTP). Esse arquivo só existe no servidor.
+2. **Pasta:** crie `/opt/casamento/.env` a partir de [docker/.env.producao.example](docker/.env.producao.example) (domínio e senha do banco, gerada com `openssl rand -hex 24`). Login, Stripe e SMTP vêm dos secrets do GitHub.
 3. **Script de deploy:** copie [docker/deploy-vps.sh](docker/deploy-vps.sh) para `/usr/local/bin/casamento-deploy` (`chmod 755`).
 4. **Chave do GitHub Actions**, só para este projeto:
    ```bash
@@ -184,12 +199,8 @@ O VPS não tem o código nem compila nada: em `/opt/casamento` ficam só o `.env
    ```
    No GitHub, a privada vai no secret `VPS_SSH_KEY` (*Settings → Secrets and variables → Actions*). Crie também o ambiente `producao` em *Settings → Environments*. A chave aparece em *hPanel → VPS → Chaves SSH* como `… github-actions-deploy@casamento`, igual à do temagua.
 5. **Banco:** suba o Postgres uma vez (`cd /opt/casamento && docker compose -f compose.yaml -f compose.producao.yaml up -d --wait db`); os deploys de cada parte trocam só a API ou o site (`--no-deps`). O Traefik do servidor (`traefik-duis-traefik-1`) roda em rede `host` e acha o container `web` pelos labels, sem precisar ligar redes.
-6. **Conta do painel:**
-   ```bash
-   cd /opt/casamento && docker compose -f compose.yaml -f compose.producao.yaml exec api node src/seed.ts
-   ```
-   Em produção o seed só cria/atualiza o login; não cadastra conteúdo de exemplo.
-7. **Stripe:** crie o webhook `https://casamentonayaraevictor.com.br/api/stripe/webhook` (modo live, eventos na seção do Stripe acima), coloque o `whsec_...` em `STRIPE_WEBHOOK_SECRET` no `.env` e rode `casamento-deploy backend`.
+6. **Conta do painel:** preencha os secrets `ADMIN_EMAIL` e `ADMIN_PASSWORD`; o deploy roda o seed sozinho (em produção ele só cria/atualiza o login, sem conteúdo de exemplo).
+7. **Stripe:** crie o webhook `https://casamentonayaraevictor.com.br/api/stripe/webhook` (modo live, eventos na seção do Stripe acima) e coloque a chave e o `whsec_...` nos secrets `STRIPE_SECRET_KEY` e `STRIPE_WEBHOOK_SECRET`.
 
 **Voltar uma versão:** no servidor, `casamento-deploy backend <commit>` ou `casamento-deploy frontend <commit>` com o SHA de um commit já publicado.
 

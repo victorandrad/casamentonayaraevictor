@@ -5,9 +5,10 @@
 #
 # As imagens vêm prontas do registro do GitHub (build feito uma vez no CI): o VPS não compila nada.
 # API_TAG/WEB_TAG = commit publicado (o casamento-deploy grava no .env a cada deploy).
-# Variáveis em .env (fora do git): DOMINIO, POSTGRES_PASSWORD, ADMIN_*, STRIPE_*, SMTP_*, EMAIL_*,
-# API_TAG, WEB_TAG. Nenhuma porta aberta no servidor: só o Traefik chega ao web, pela rede
-# casamento-nv_default.
+# .env (fora do git, criado uma vez no servidor): DOMINIO, POSTGRES_*, API_TAG, WEB_TAG.
+# segredos.env: login do painel, Stripe e SMTP, vindos dos secrets/variables do GitHub e gravados pelo
+# casamento-deploy a cada deploy. Nenhuma porta aberta no servidor: só o Traefik chega ao web, pela
+# rede casamento-nv_default.
 services:
   db:
     ports: !reset []
@@ -17,11 +18,19 @@ services:
     build: !reset null
     image: ghcr.io/victorandrad/casamento-api:${API_TAG:-latest}
     ports: !reset []
-    environment:
+    # Troca a lista inteira do compose.yaml: o resto vem do segredos.env.
+    environment: !override
       NODE_ENV: production
+      PORT: 4100
+      DATABASE_URL: postgres://${POSTGRES_USER:-casamento}:${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}@db:5432/${POSTGRES_DB:-casamento}
       ALLOWED_ORIGINS: https://${DOMINIO:?defina DOMINIO no .env}
       SITE_URL: https://${DOMINIO}
       COOKIE_SECURE: "true"
+    # raw: cada valor é usado como está (senhas com $, aspas ou espaços não quebram).
+    env_file:
+      - path: segredos.env
+        format: raw
+        required: false
     depends_on: !override
       db:
         condition: service_healthy
