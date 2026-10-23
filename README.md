@@ -182,11 +182,8 @@ O VPS não tem o código nem compila nada: em `/opt/casamento` ficam só o `.env
    ```
    restrict,command="/usr/local/bin/casamento-deploy" ssh-ed25519 AAAA... github-actions-deploy@casamento
    ```
-   No GitHub, a privada vai no secret `VPS_SSH_KEY` (*Settings → Secrets and variables → Actions*). Crie também o ambiente `producao` em *Settings → Environments*.
-5. **Primeira subida e Traefik:** rode `casamento-deploy tudo` no servidor (cria a rede `casamento-nv_default` e sobe banco, API e site) e ligue o Traefik a ela, como no temagua:
-   ```bash
-   docker network connect casamento-nv_default <container-do-traefik>
-   ```
+   No GitHub, a privada vai no secret `VPS_SSH_KEY` (*Settings → Secrets and variables → Actions*). Crie também o ambiente `producao` em *Settings → Environments*. A chave aparece em *hPanel → VPS → Chaves SSH* como `… github-actions-deploy@casamento`, igual à do temagua.
+5. **Banco:** suba o Postgres uma vez (`cd /opt/casamento && docker compose -f compose.yaml -f compose.producao.yaml up -d --wait db`); os deploys de cada parte trocam só a API ou o site (`--no-deps`). O Traefik do servidor (`traefik-duis-traefik-1`) roda em rede `host` e acha o container `web` pelos labels, sem precisar ligar redes.
 6. **Conta do painel:**
    ```bash
    cd /opt/casamento && docker compose -f compose.yaml -f compose.producao.yaml exec api node src/seed.ts
