@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icon, type IconName } from '@nv/shared';
 import type { Usuario } from '@nv/shared/types';
 import { Resumo } from './abas/Resumo';
@@ -29,6 +29,12 @@ export function Dashboard({ usuario, onSair, onUsuario }: { usuario: Usuario; on
   const [aba, setAba] = useState<AbaId>('resumo');
   // E-mails and Configurações only for the master user (the API enforces it too).
   const visiveis = abas.filter((a) => !('master' in a) || usuario.dono);
+  const barra = useRef<HTMLElement>(null);
+
+  // On phones the tab row slides sideways: keep the current tab in view.
+  useEffect(() => {
+    barra.current?.querySelector<HTMLElement>('.painel-tab.is-active')?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  }, [aba]);
 
   return (
     <div className="painel">
@@ -52,7 +58,7 @@ export function Dashboard({ usuario, onSair, onUsuario }: { usuario: Usuario; on
         </div>
       </header>
 
-      <nav className="painel-tabs" aria-label="Seções do painel">
+      <nav ref={barra} className="painel-tabs" aria-label="Seções do painel">
         {visiveis.map((a) => (
           <button
             key={a.id}
