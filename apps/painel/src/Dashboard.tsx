@@ -18,15 +18,17 @@ const abas = [
   { id: 'recebidos', label: 'Recebidos', icon: 'gift' },
   { id: 'presentes', label: 'Lista de presentes', icon: 'home' },
   { id: 'galeria', label: 'Galeria', icon: 'camera' },
-  { id: 'emails', label: 'E-mails', icon: 'envelope' },
-  { id: 'configuracoes', label: 'Configurações', icon: 'calendar' },
+  { id: 'emails', label: 'E-mails', icon: 'envelope', master: true },
+  { id: 'configuracoes', label: 'Configurações', icon: 'calendar', master: true },
   { id: 'conta', label: 'Minha conta', icon: 'lock' },
-] as const satisfies ReadonlyArray<{ id: string; label: string; icon: IconName }>;
+] as const satisfies ReadonlyArray<{ id: string; label: string; icon: IconName; master?: boolean }>;
 
 type AbaId = (typeof abas)[number]['id'];
 
 export function Dashboard({ usuario, onSair, onUsuario }: { usuario: Usuario; onSair: () => void; onUsuario: (u: Usuario) => void }) {
   const [aba, setAba] = useState<AbaId>('resumo');
+  // E-mails and Configurações only for the master user (the API enforces it too).
+  const visiveis = abas.filter((a) => !('master' in a) || usuario.dono);
 
   return (
     <div className="painel">
@@ -51,7 +53,7 @@ export function Dashboard({ usuario, onSair, onUsuario }: { usuario: Usuario; on
       </header>
 
       <nav className="painel-tabs" aria-label="Seções do painel">
-        {abas.map((a) => (
+        {visiveis.map((a) => (
           <button
             key={a.id}
             className={a.id === aba ? 'painel-tab is-active' : 'painel-tab'}
@@ -71,8 +73,8 @@ export function Dashboard({ usuario, onSair, onUsuario }: { usuario: Usuario; on
         {aba === 'recebidos' && <Recebidos />}
         {aba === 'presentes' && <Presentes />}
         {aba === 'galeria' && <Galeria />}
-        {aba === 'emails' && <Emails />}
-        {aba === 'configuracoes' && <Configuracoes usuario={usuario} />}
+        {aba === 'emails' && usuario.dono && <Emails />}
+        {aba === 'configuracoes' && usuario.dono && <Configuracoes usuario={usuario} />}
         {aba === 'conta' && <Conta usuario={usuario} onUsuario={onUsuario} />}
       </main>
     </div>

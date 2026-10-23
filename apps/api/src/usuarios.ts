@@ -84,7 +84,7 @@ export async function reenviarConvite(id: number, convidadoPor: string) {
 export async function remover(id: number, solicitante: Usuario) {
   const row = await queryOne<{ email: string }>('SELECT email FROM usuarios WHERE id = $1', [id]);
   if (!row) throw new ErroUsuario('Usuário não encontrado.', 404);
-  if (id === solicitante.id || ehDono(row.email)) throw new ErroUsuario('A conta do dono do painel não pode ser removida.', 409);
+  if (id === solicitante.id || ehDono(row.email)) throw new ErroUsuario('A conta do usuário master não pode ser removida.', 409);
   await query('DELETE FROM usuarios WHERE id = $1', [id]); // sessions and invites go with it (cascade)
 }
 

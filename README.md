@@ -38,7 +38,8 @@ Outros comandos: `npm run build`, `npm run typecheck`, `npm run lint`, `npm run 
 ### Minha conta e usuários do painel
 
 - **Minha conta** (qualquer usuário): editar o nome e trocar a senha (pede a senha atual; os outros aparelhos conectados saem). Se existir uma caixa de e-mail com o mesmo endereço, ela passa a usar a mesma senha.
-- **Usuários do painel** (só o dono, a conta do `ADMIN_EMAIL`): convidar pelo nome e e-mail, reenviar o convite e remover. O convidado recebe um e-mail ("Criar minha senha") com um link de uso único que vale 7 dias (`/painel#definir-senha=…`; no banco fica só o hash do token); ao criar a senha, já entra no painel. Se o e-mail não sair, o painel mostra o link para copiar e mandar por outro meio.
+- **Usuário master** (a conta do `ADMIN_EMAIL`, ex.: `contato@`): o único que vê as abas **E-mails** e **Configurações** e a lista de usuários. A API também barra os outros (403) nas rotas de e-mail, ao salvar configurações e na gestão de usuários; a leitura das configurações segue liberada porque a Lista de presentes mostra a taxa.
+- **Usuários do painel** (só o master): convidar pelo nome e e-mail, reenviar o convite e remover. O convidado recebe um e-mail ("Criar minha senha") com um link de uso único que vale 7 dias (`/painel#definir-senha=…`; no banco fica só o hash do token); ao criar a senha, já entra no painel. Se o e-mail não sair, o painel mostra o link para copiar e mandar por outro meio.
 - O `ADMIN_PASSWORD` cria o dono e só é aplicado de novo quando o secret **muda** (guardamos um hash do último valor aplicado), então trocar a senha pelo painel não é desfeito no próximo deploy.
 
 ### Contas do painel

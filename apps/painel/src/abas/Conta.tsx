@@ -209,7 +209,7 @@ function ConvidarModal({ onConvidado, onFechar }: { onConvidado: (r: ConviteEnvi
             maxLength={200}
             onChange={(e) => setEmail(e.target.value)}
           />
-          <p className="painel-hint">Quem você convidar consegue usar todo o painel, menos esta lista de usuários.</p>
+          <p className="painel-hint">Quem você convidar usa o painel, menos usuários, e-mails e configurações, que ficam só com o master.</p>
           {erro && (
             <p className="painel-alert" role="alert">
               {erro}
@@ -264,7 +264,7 @@ function Usuarios({ usuario }: { usuario: Usuario }) {
               <div className="painel-item__title">
                 <strong>{u.nome}</strong>
                 {u.dono ? (
-                  <span className="painel-badge painel-badge--sim">Dono</span>
+                  <span className="painel-badge painel-badge--sim">Master</span>
                 ) : u.status === 'ativo' ? (
                   <span className="painel-badge painel-badge--sim">Ativo</span>
                 ) : (
@@ -341,7 +341,7 @@ export function Conta({ usuario, onUsuario }: { usuario: Usuario; onUsuario: (u:
           <dt>E-mail</dt>
           <dd>{usuario.email}</dd>
           <dt>Acesso</dt>
-          <dd>{usuario.dono ? 'Dono do painel (gerencia os usuários)' : 'Usuário do painel'}</dd>
+          <dd>{usuario.dono ? 'Usuário master (usuários, e-mails e configurações)' : 'Usuário do painel'}</dd>
         </dl>
         <div className="conta-acoes">
           <button className="nv-btn-ghost" onClick={() => setEditandoNome(true)}>

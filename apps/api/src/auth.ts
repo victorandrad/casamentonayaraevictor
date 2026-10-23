@@ -87,9 +87,9 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply) 
   request.usuario = usuario;
 }
 
-// preHandler for the owner-only routes (user management); runs after requireAuth.
+// preHandler for the master-only areas (users, e-mails, settings); runs after requireAuth.
 export async function requireOwner(request: FastifyRequest, reply: FastifyReply) {
-  if (!request.usuario?.dono) return reply.code(403).send({ erro: 'Só o dono do painel pode gerenciar os usuários.' });
+  if (!request.usuario?.dono) return reply.code(403).send({ erro: 'Só o usuário master pode acessar esta área.' });
 }
 
 // Small in-memory limiter (one API instance is plenty for a wedding site).

@@ -80,6 +80,14 @@ const notFound = { erro: 'Item não encontrado.' };
 
 export async function adminRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAuth);
+  // E-mails and changing the settings are for the master only (the settings stay readable: the gift
+  // list shows the fee from them).
+  app.addHook('preHandler', async (req, reply) => {
+    const rota = req.routeOptions.url ?? '';
+    if (rota.startsWith('/api/admin/emails') || (rota === '/api/admin/configuracoes' && req.method !== 'GET')) {
+      return requireOwner(req, reply);
+    }
+  });
 
   app.get('/resumo', async () => repo.resumo());
 
