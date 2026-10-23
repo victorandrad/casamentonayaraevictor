@@ -6,6 +6,7 @@ import { hashPassword } from './auth.ts';
 import { pool, query, queryOne } from './db.ts';
 import { migrate } from './migrate.ts';
 import * as repo from './repo.ts';
+import { sincronizarCaixaDoPainel } from './emails.ts';
 
 // Keyed by category name (the categories come from migration 007).
 const presentes = {
@@ -61,6 +62,10 @@ async function seedAdmin() {
     [email, nome, await hashPassword(password)],
   );
   console.log(`Conta do painel pronta: ${email}`);
+
+  // Same password for the mailbox with this address (when it is on the mail server's domain).
+  const caixa = await sincronizarCaixaDoPainel(password);
+  if (caixa !== 'ignorada') console.log(`Caixa de e-mail ${email}: ${caixa}`);
 }
 
 async function seedContent() {

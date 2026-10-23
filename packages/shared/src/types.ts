@@ -59,6 +59,8 @@ export type EmailsAdmin = {
   dominio: string;
   caixas: CaixaEmail[];
   apelidos: ApelidoEmail[];
+  // Mailbox whose password is the panel login's (ADMIN_PASSWORD); managed by the deploy, not here.
+  caixaDoPainel: string | null;
   servidor: { imap: string; smtp: string; webmail: string };
 };
 

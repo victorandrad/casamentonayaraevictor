@@ -35,6 +35,8 @@ export const config = {
     configDir: env.MAIL_CONFIG_DIR ?? '',
     domain: (env.MAIL_DOMAIN ?? '').trim().toLowerCase(),
     webmailUrl: env.WEBMAIL_URL ?? '',
+    // The mailbox with the panel login's address uses the panel password (synced by the seed).
+    adminEmail: (env.ADMIN_EMAIL ?? '').trim().toLowerCase(),
   },
   // Receipt e-mails over SMTP (local Mailpit by default)
   smtp: {

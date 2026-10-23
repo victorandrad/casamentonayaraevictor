@@ -118,6 +118,7 @@ O VPS roda um servidor de e-mail completo para o domínio, que **envia e recebe*
 - **mailserver** ([docker-mailserver](https://docker-mailserver.github.io/docker-mailserver/latest/) 16: Postfix + Dovecot + Rspamd com DKIM). Portas 25 (receber), 465/587 (enviar com login) e 993 (IMAP), só em IPv4. O certificado é o que o Traefik emite para `mail.casamentonayaraevictor.com.br`, lido do `acme.json` dele.
 - **webmail** (Roundcube) em **https://mail.casamentonayaraevictor.com.br**.
 - **Caixas e apelidos no painel**, aba **E-mails**: criar e excluir caixas, trocar senha, criar apelidos (ex.: `presentes@` entregando em `contato@` ou num Gmail). A API grava `postfix-accounts.cf` (senhas em `{SHA512-CRYPT}`) e `postfix-virtual.cf` no volume de configuração que divide com o mailserver, que recarrega sozinho em poucos segundos.
+- **Caixa do login do painel**: a caixa com o mesmo endereço do `ADMIN_EMAIL` (ex.: `contato@`) usa a mesma senha do `ADMIN_PASSWORD`. O seed cria ou atualiza essa caixa em todo deploy do Backend; no painel ela aparece como "Login do painel", sem "Trocar senha" nem "Excluir". Para trocar a senha das duas: mude o secret e rode o Backend.
 - O docker-mailserver só sobe com pelo menos uma caixa: a primeira foi `postmaster@` (senha aleatória gerada no servidor; troque pelo painel se quiser usá-la). Ela recebe os avisos de outros servidores.
 - **fail2ban**: os logins do webmail chegam do container do Roundcube, então a rede interna do projeto fica fora dos bloqueios (senão poucas senhas erradas travariam o webmail de todos por uma semana). Fica em `fail2ban-jail.cf` no volume de configuração do mailserver (`[DEFAULT]` `ignoreip = 127.0.0.1/8 <sub-rede de casamento-nv_default>`) e só vale depois de recriar o container (`up -d --force-recreate mailserver`). As portas 993/587/465 continuam protegidas.
 - Os **recibos** saem pela porta 25 interna, sem login (o mailserver confia só na rede do projeto, `PERMIT_DOCKER=connected-networks`). Remetente: `EMAIL_FROM` (`presentes@…`); crie o apelido `presentes@` para as respostas chegarem numa caixa.
@@ -181,7 +182,7 @@ Em *Settings → Secrets and variables → Actions*. A cada deploy o job manda o
 | Tipo | Nome | Para quê |
 | --- | --- | --- |
 | Secret | `VPS_SSH_KEY` | chave do deploy (presa ao `casamento-deploy`) |
-| Secret | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | login do painel (senha com 10+ caracteres) |
+| Secret | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | login do painel (senha com 10+ caracteres); também a caixa de e-mail com esse endereço |
 | Secret | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe em modo real (`sk_live_…`, `whsec_…`) |
 | Variable | `ADMIN_NOME`, `EMAIL_FROM`, `EMAIL_REPLY_TO` | nome no painel e remetente dos recibos |
 

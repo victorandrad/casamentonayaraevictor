@@ -117,10 +117,11 @@ else
   fi
 fi
 
-# Login do painel: o seed cria/atualiza a conta com ADMIN_EMAIL/ADMIN_PASSWORD (em produção não
-# cadastra conteúdo de exemplo).
-if [ "$segredos_mudaram" = true ] && [ -n "$($compose ps -q api)" ] \
-  && grep -q '^ADMIN_EMAIL=.' segredos.env && grep -q '^ADMIN_PASSWORD=.' segredos.env; then
+# Login do painel: o seed cria/atualiza a conta com ADMIN_EMAIL/ADMIN_PASSWORD e a caixa de e-mail
+# com o mesmo endereço (mesma senha). Roda em todo deploy do backend e quando os segredos mudam; em
+# produção não cadastra conteúdo de exemplo.
+if { [ "$segredos_mudaram" = true ] || [ "$alvo" != frontend ]; } && [ -n "$($compose ps -q api)" ] \
+  && grep -q '^ADMIN_EMAIL=.' segredos.env 2>/dev/null && grep -q '^ADMIN_PASSWORD=.' segredos.env; then
   $compose exec -T api node src/seed.ts
 fi
 docker image prune -f >/dev/null

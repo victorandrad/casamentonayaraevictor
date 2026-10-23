@@ -5,7 +5,7 @@
 //   postfix-virtual.cf   →  apelido destino1,destino2         (aliases / forwards)
 import { access, constants, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { encrypt } from 'unixcrypt';
+import { encrypt, verify } from 'unixcrypt';
 import type { ApelidoEmail, CaixaEmail, EmailsAdmin } from '@nv/shared/types';
 import { config } from './config.ts';
 
@@ -100,6 +100,22 @@ function validarDestinos(destinos: string[]): string[] {
 }
 
 const hashDaSenha = (senha: string) => `{SHA512-CRYPT}${encrypt(senha)}`;
+const PREFIXO_HASH = '{SHA512-CRYPT}';
+
+// The panel login's mailbox (same address as ADMIN_EMAIL), when it belongs to this domain.
+export function caixaDoPainel(): string | null {
+  const email = config.mail.adminEmail;
+  return domain && email.endsWith(`@${domain}`) ? email : null;
+}
+
+function protegerCaixaDoPainel(endereco: string) {
+  if (endereco === caixaDoPainel()) {
+    throw new ErroEmail(
+      'A senha desta caixa é a mesma do login do painel: troque o secret ADMIN_PASSWORD no GitHub e rode o deploy do Backend.',
+      409,
+    );
+  }
+}
 
 export async function listar(): Promise<EmailsAdmin> {
   const pronto = await disponivel();
@@ -109,6 +125,7 @@ export async function listar(): Promise<EmailsAdmin> {
     dominio: domain,
     caixas: caixas.sort((a, b) => a.endereco.localeCompare(b.endereco)),
     apelidos: pronto ? (await lerApelidos()).sort((a, b) => a.endereco.localeCompare(b.endereco)) : [],
+    caixaDoPainel: caixaDoPainel(),
     servidor: {
       imap: domain ? `mail.${domain}` : '',
       smtp: domain ? `mail.${domain}` : '',
@@ -139,6 +156,7 @@ export function trocarSenha(endereco: string, senha: string): Promise<void> {
     const contas = await lerContas();
     const alvo = endereco.trim().toLowerCase();
     if (!contas.some((c) => c.endereco === alvo)) throw new ErroEmail('Caixa não encontrada.', 404);
+    protegerCaixaDoPainel(alvo);
     await gravarLinhas(
       CONTAS,
       contas.map((c) => (c.endereco === alvo ? `${c.endereco}|${hashDaSenha(senha)}` : c.linha)),
@@ -153,6 +171,7 @@ export function excluirCaixa(endereco: string): Promise<void> {
     const contas = await lerContas();
     const alvo = endereco.trim().toLowerCase();
     if (!contas.some((c) => c.endereco === alvo)) throw new ErroEmail('Caixa não encontrada.', 404);
+    protegerCaixaDoPainel(alvo);
     await gravarLinhas(CONTAS, contas.filter((c) => c.endereco !== alvo).map((c) => c.linha));
   });
 }
@@ -188,5 +207,21 @@ export function excluirApelido(endereco: string): Promise<void> {
       APELIDOS,
       apelidos.filter((a) => a.endereco !== alvo).map((a) => `${a.endereco} ${a.destinos.join(',')}`),
     );
+  });
+}
+
+// Called by the seed on every backend deploy: the panel login's mailbox gets (or keeps) the panel
+// password. Nothing is written when the stored hash already matches.
+export function sincronizarCaixaDoPainel(senha: string): Promise<'criada' | 'atualizada' | 'igual' | 'ignorada'> {
+  return emOrdem(async () => {
+    const endereco = caixaDoPainel();
+    if (!endereco || !senha || !(await disponivel())) return 'ignorada';
+    if ((await lerApelidos()).some((a) => a.endereco === endereco)) return 'ignorada';
+    const contas = await lerContas();
+    const atual = contas.find((c) => c.endereco === endereco);
+    if (atual && atual.hash.startsWith(PREFIXO_HASH) && verify(senha, atual.hash.slice(PREFIXO_HASH.length))) return 'igual';
+    const linha = `${endereco}|${hashDaSenha(senha)}`;
+    await gravarLinhas(CONTAS, atual ? contas.map((c) => (c.endereco === endereco ? linha : c.linha)) : [...contas.map((c) => c.linha), linha]);
+    return atual ? 'atualizada' : 'criada';
   });
 }

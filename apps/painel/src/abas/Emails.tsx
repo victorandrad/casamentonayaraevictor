@@ -324,26 +324,39 @@ export function Emails() {
             </EstadoVazio>
           ) : (
             <ul className="painel-list">
-              {data.caixas.map((c) => (
-                <li key={c.endereco} className="painel-item">
-                  <div className="painel-item__main">
-                    <div className="painel-item__title">
-                      <strong>{c.endereco}</strong>
+              {data.caixas.map((c) => {
+                const doPainel = c.endereco === data.caixaDoPainel;
+                return (
+                  <li key={c.endereco} className="painel-item">
+                    <div className="painel-item__main">
+                      <div className="painel-item__title">
+                        <strong>{c.endereco}</strong>
+                        {doPainel && <span className="painel-badge painel-badge--sim">Login do painel</span>}
+                      </div>
+                      {doPainel && (
+                        <div className="painel-item__meta">
+                          <span>Mesma senha do login do painel. Para trocar, mude o secret ADMIN_PASSWORD e rode o deploy do Backend.</span>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <div className="painel-item__actions">
-                    <a className="painel-link" href={data.servidor.webmail} target="_blank" rel="noopener">
-                      Abrir webmail
-                    </a>
-                    <button className="painel-link" onClick={() => setSenhaDe(c)}>
-                      Trocar senha
-                    </button>
-                    <button className="painel-link painel-link--danger" onClick={() => setExcluindoCaixa(c)}>
-                      Excluir
-                    </button>
-                  </div>
-                </li>
-              ))}
+                    <div className="painel-item__actions">
+                      <a className="painel-link" href={data.servidor.webmail} target="_blank" rel="noopener">
+                        Abrir webmail
+                      </a>
+                      {!doPainel && (
+                        <>
+                          <button className="painel-link" onClick={() => setSenhaDe(c)}>
+                            Trocar senha
+                          </button>
+                          <button className="painel-link painel-link--danger" onClick={() => setExcluindoCaixa(c)}>
+                            Excluir
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
 
