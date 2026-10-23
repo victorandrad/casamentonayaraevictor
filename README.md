@@ -118,6 +118,7 @@ O VPS roda um servidor de e-mail completo para o domínio, que **envia e recebe*
 - **mailserver** ([docker-mailserver](https://docker-mailserver.github.io/docker-mailserver/latest/) 16: Postfix + Dovecot + Rspamd com DKIM). Portas 25 (receber), 465/587 (enviar com login) e 993 (IMAP), só em IPv4. O certificado é o que o Traefik emite para `mail.casamentonayaraevictor.com.br`, lido do `acme.json` dele.
 - **webmail** (Roundcube) em **https://mail.casamentonayaraevictor.com.br**.
 - **Caixas e apelidos no painel**, aba **E-mails**: criar e excluir caixas, trocar senha, criar apelidos (ex.: `presentes@` entregando em `contato@` ou num Gmail). A API grava `postfix-accounts.cf` (senhas em `{SHA512-CRYPT}`) e `postfix-virtual.cf` no volume de configuração que divide com o mailserver, que recarrega sozinho em poucos segundos.
+- O docker-mailserver só sobe com pelo menos uma caixa: a primeira foi `postmaster@` (senha aleatória gerada no servidor; troque pelo painel se quiser usá-la). Ela recebe os avisos de outros servidores.
 - Os **recibos** saem pela porta 25 interna, sem login (o mailserver confia só na rede do projeto, `PERMIT_DOCKER=connected-networks`). Remetente: `EMAIL_FROM` (`presentes@…`); crie o apelido `presentes@` para as respostas chegarem numa caixa.
 
 DNS (Registro.br) e servidor:

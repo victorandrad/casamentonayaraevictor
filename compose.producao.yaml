@@ -81,7 +81,8 @@ services:
       - "0.0.0.0:587:587"
       - "0.0.0.0:993:993"
     volumes:
-      - traefik-letsencrypt:/etc/letsencrypt:ro
+      # Só o arquivo (só leitura): o mailserver extrai o certificado para /etc/letsencrypt/live.
+      - /var/lib/docker/volumes/traefik-duis_traefik-letsencrypt/_data/acme.json:/etc/letsencrypt/acme.json:ro
     networks:
       default:
         # Dentro da rede do projeto o nome público aponta para cá: API e webmail falam com o
@@ -105,9 +106,3 @@ services:
       traefik.http.routers.casamento-mail.entrypoints: websecure
       traefik.http.routers.casamento-mail.tls.certresolver: letsencrypt
       traefik.http.services.casamento-mail.loadbalancer.server.port: "80"
-
-volumes:
-  # Certificados do Traefik do servidor (acme.json), só leitura para o mailserver.
-  traefik-letsencrypt:
-    external: true
-    name: traefik-duis_traefik-letsencrypt
