@@ -29,6 +29,13 @@ export const config = {
   stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET ?? '',
   // Uploaded gift photos (a Docker volume in production)
   uploadsDir: env.UPLOADS_DIR ?? join(import.meta.dirname, '..', 'uploads'),
+  // Mail server config folder shared with docker-mailserver (mailboxes managed in the panel).
+  // Empty = the E-mails tab shows that the mail server is not set up here.
+  mail: {
+    configDir: env.MAIL_CONFIG_DIR ?? '',
+    domain: (env.MAIL_DOMAIN ?? '').trim().toLowerCase(),
+    webmailUrl: env.WEBMAIL_URL ?? '',
+  },
   // Receipt e-mails over SMTP (local Mailpit by default)
   smtp: {
     host: env.SMTP_HOST ?? 'localhost',

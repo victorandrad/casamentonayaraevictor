@@ -51,6 +51,17 @@ export type Usuario = { id: number; email: string; nome: string };
 export type LoginInput = { email: string; senha: string };
 
 // Admin
+// Mailboxes of the couple's own mail server, managed in the panel (E-mails tab).
+export type CaixaEmail = { endereco: string };
+export type ApelidoEmail = { endereco: string; destinos: string[] };
+export type EmailsAdmin = {
+  disponivel: boolean; // false when the mail server is not set up here (e.g. local dev)
+  dominio: string;
+  caixas: CaixaEmail[];
+  apelidos: ApelidoEmail[];
+  servidor: { imap: string; smtp: string; webmail: string };
+};
+
 export type Resumo = {
   convidados: number;
   responderam: number;

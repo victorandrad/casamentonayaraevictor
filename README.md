@@ -105,32 +105,35 @@ No painel, cada presente tem um campo de **upload de foto** (JPG, PNG, WebP ou H
 
 Quando um presente é pago, a API envia ao convidado um **recibo por e-mail** (itens, total pago, data, forma de pagamento, número do pedido e a mensagem dele), no visual do site. O envio acontece **uma única vez** por pedido (o banco marca `recibo_enviado_em`; se o envio falhar, a marca é desfeita para tentar de novo) e o painel, na aba **Recebidos**, mostra o status e tem o botão **Reenviar recibo**.
 
-O envio é por **SMTP**, configurado pelas variáveis `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` e `EMAIL_REPLY_TO`.
+O envio é por **SMTP** (`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`), com o remetente em `EMAIL_FROM` e `EMAIL_REPLY_TO`. Em produção o SMTP é o servidor de e-mail do próprio projeto (abaixo), sem nada para configurar.
 
 ### Desenvolvimento: Mailpit
 
 O `docker compose up -d` sobe o **Mailpit**, um servidor de e-mail local que recebe tudo o que a API envia e mostra numa caixa de entrada em **http://localhost:8025**. Nada sai da sua máquina.
 
-### Produção: servidor de e-mail próprio
+### Produção: servidor de e-mail próprio (`@casamentonayaraevictor.com.br`)
 
-O `compose.yaml` traz o serviço `mailserver` ([docker-mailserver](https://docker-mailserver.github.io/docker-mailserver/latest/): Postfix + Dovecot + Rspamd com DKIM), desligado por padrão (perfil `email`). Para ele entregar na caixa de entrada (e não no spam) é preciso:
+O VPS roda um servidor de e-mail completo para o domínio, que **envia e recebe**:
 
-1. **Um VPS com IP fixo e a porta 25 liberada** (muitos provedores bloqueiam a 25 por padrão e liberam sob pedido; internet residencial não serve).
-2. **DNS do domínio**:
-   - `A` `mail.seudominio` → IP do servidor, e `MX` do domínio → `mail.seudominio`;
-   - **PTR (DNS reverso)** do IP → `mail.seudominio` (configurado no painel do provedor do VPS);
-   - **SPF**: `TXT` `v=spf1 mx -all`;
-   - **DKIM**: gere a chave com `docker compose exec mailserver setup config dkim` e publique o `TXT` indicado;
-   - **DMARC**: `TXT` em `_dmarc` com `v=DMARC1; p=quarantine; rua=mailto:...`.
-3. **Certificado TLS** (Let's Encrypt para `mail.seudominio`).
-4. Subir e criar a conta que envia:
-   ```bash
-   docker compose --profile email up -d mailserver
-   docker compose exec mailserver setup email add presentes@seudominio 'uma-senha-forte'
-   ```
-5. No `.env`: `SMTP_HOST=mailserver`, `SMTP_PORT=587`, `SMTP_SECURE=false` (usa STARTTLS), `SMTP_USER=presentes@seudominio`, `SMTP_PASS=...`, `EMAIL_FROM="Nayara & Victor <presentes@seudominio>"`; depois `docker compose up -d api`.
+- **mailserver** ([docker-mailserver](https://docker-mailserver.github.io/docker-mailserver/latest/) 16: Postfix + Dovecot + Rspamd com DKIM). Portas 25 (receber), 465/587 (enviar com login) e 993 (IMAP), só em IPv4. O certificado é o que o Traefik emite para `mail.casamentonayaraevictor.com.br`, lido do `acme.json` dele.
+- **webmail** (Roundcube) em **https://mail.casamentonayaraevictor.com.br**.
+- **Caixas e apelidos no painel**, aba **E-mails**: criar e excluir caixas, trocar senha, criar apelidos (ex.: `presentes@` entregando em `contato@` ou num Gmail). A API grava `postfix-accounts.cf` (senhas em `{SHA512-CRYPT}`) e `postfix-virtual.cf` no volume de configuração que divide com o mailserver, que recarrega sozinho em poucos segundos.
+- Os **recibos** saem pela porta 25 interna, sem login (o mailserver confia só na rede do projeto, `PERMIT_DOCKER=connected-networks`). Remetente: `EMAIL_FROM` (`presentes@…`); crie o apelido `presentes@` para as respostas chegarem numa caixa.
 
-Teste a reputação em https://www.mail-tester.com antes do casamento. Se preferir não manter um servidor de e-mail, as mesmas variáveis SMTP funcionam com qualquer provedor (Amazon SES, Brevo, Zoho, Google Workspace…).
+DNS (Registro.br) e servidor:
+
+| Registro | Nome | Valor |
+| --- | --- | --- |
+| A | `mail` | `177.7.36.12` |
+| MX | (domínio) | `mail.casamentonayaraevictor.com.br` (prioridade 10) |
+| TXT (SPF) | (domínio) | `v=spf1 mx -all` |
+| TXT (DKIM) | `mail._domainkey` | chave gerada com `docker compose -f compose.yaml -f compose.producao.yaml exec mailserver setup config dkim domain casamentonayaraevictor.com.br` |
+| TXT (DMARC) | `_dmarc` | `v=DMARC1; p=quarantine; adkim=s; aspf=s` |
+| PTR (reverso) | `177.7.36.12` | `mail.casamentonayaraevictor.com.br` (hPanel → VPS → Configurações → DNS reverso) |
+
+No celular ou no Outlook/Thunderbird: conta IMAP, usuário = endereço completo, entrada `mail.casamentonayaraevictor.com.br` porta 993 SSL/TLS, saída no mesmo endereço, porta 587 STARTTLS. Teste a reputação em https://www.mail-tester.com antes do casamento.
+
+Localmente o mailserver e o webmail ficam no perfil `email` (`docker compose --profile email up -d mailserver webmail`, webmail em http://localhost:8089, domínio `casamento.localhost`).
 
 ## Deploy (GitHub Actions → VPS)
 
@@ -178,16 +181,14 @@ Em *Settings → Secrets and variables → Actions*. A cada deploy o job manda o
 | Secret | `VPS_SSH_KEY` | chave do deploy (presa ao `casamento-deploy`) |
 | Secret | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | login do painel (senha com 10+ caracteres) |
 | Secret | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe em modo real (`sk_live_…`, `whsec_…`) |
-| Secret | `SMTP_USER`, `SMTP_PASS` | conta do servidor de e-mail dos recibos |
 | Variable | `ADMIN_NOME`, `EMAIL_FROM`, `EMAIL_REPLY_TO` | nome no painel e remetente dos recibos |
-| Variable | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` | servidor de e-mail (ex.: `smtp-relay.brevo.com`, `587`, `false`) |
 
 Mudou um valor? Rode *Actions → Backend → Run workflow* (ou espere o próximo push) para ele chegar ao servidor. O Nginx da imagem web ([docker/nginx.conf](docker/nginx.conf)) serve os arquivos e repassa `/api` para a API.
 
 ### Preparar o servidor (uma vez)
 
 1. **DNS:** registros `A` de `casamentonayaraevictor.com.br` e `www` apontando para `177.7.36.12`.
-2. **Pasta:** crie `/opt/casamento/.env` a partir de [docker/.env.producao.example](docker/.env.producao.example) (domínio e senha do banco, gerada com `openssl rand -hex 24`). Login, Stripe e SMTP vêm dos secrets do GitHub.
+2. **Pasta:** crie `/opt/casamento/.env` a partir de [docker/.env.producao.example](docker/.env.producao.example) (domínio e senha do banco, gerada com `openssl rand -hex 24`). Login, Stripe e remetente vêm dos secrets/variables do GitHub.
 3. **Script de deploy:** copie [docker/deploy-vps.sh](docker/deploy-vps.sh) para `/usr/local/bin/casamento-deploy` (`chmod 755`).
 4. **Chave do GitHub Actions**, só para este projeto:
    ```bash

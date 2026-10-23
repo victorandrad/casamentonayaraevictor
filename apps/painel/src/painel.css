@@ -634,3 +634,34 @@
 .organizar-linha__foto img { width: 100%; height: 100%; object-fit: cover; }
 .organizar-linha__nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--nv-ink); }
 .organizar-linha__valor { font-size: 14px; color: var(--nv-rose-deep); }
+
+/* E-mails tab */
+.painel-email-endereco { display: flex; align-items: stretch; }
+.painel-email-endereco .nv-input { border-top-right-radius: 0; border-bottom-right-radius: 0; min-width: 0; flex: 1; }
+.painel-email-endereco__dominio {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid var(--nv-border);
+  border-left: 0;
+  border-radius: 0 10px 10px 0;
+  background: var(--nv-sand);
+  color: var(--nv-muted);
+  font-size: 14px;
+  white-space: nowrap;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.painel-email-fixo { margin: 0 0 14px; font-weight: 500; color: var(--nv-ink); }
+.painel-senha { display: flex; align-items: center; gap: 10px; }
+.painel-senha .nv-input { flex: 1; }
+.painel-email-secao { margin-top: 30px; }
+.painel-email-acesso { margin-top: 30px; }
+.painel-email-dados { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 10px 0 0; font-size: 14px; }
+.painel-email-dados dt { color: var(--nv-taupe); }
+.painel-email-dados dd { margin: 0; color: var(--nv-ink); word-break: break-word; }
+@media (max-width: 520px) {
+  .painel-email-dados { grid-template-columns: 1fr; }
+  .painel-email-dados dd { margin-bottom: 8px; }
+}

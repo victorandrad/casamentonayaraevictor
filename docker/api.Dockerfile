@@ -18,8 +18,8 @@ COPY packages/shared/src/categorias.ts packages/shared/src/categorias.ts
 COPY apps/api/src apps/api/src
 COPY apps/api/migrations apps/api/migrations
 
-# Uploaded gift photos live here (mounted as a volume by compose.yaml)
-RUN mkdir -p /app/uploads && chown node:node /app/uploads
+# Uploaded gift photos and the mail server config folder (both volumes in compose.yaml)
+RUN mkdir -p /app/uploads /mail-config && chown node:node /app/uploads /mail-config
 ENV UPLOADS_DIR=/app/uploads
 
 WORKDIR /app/apps/api

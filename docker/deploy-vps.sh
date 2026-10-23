@@ -4,7 +4,7 @@
 #
 #   backend  <commit>  → api  (ghcr.io/victorandrad/casamento-api:<commit>)   workflow "Backend"
 #   frontend <commit>  → web  (ghcr.io/victorandrad/casamento-web:<commit>)   workflow "Frontend"
-#   tudo     [commit]  → api + web (+ db)                                      à mão
+#   tudo     [commit]  → api + web (+ db, mailserver, webmail)                 à mão
 #
 # O VPS não guarda o código (nada de git clone): /opt/casamento tem só .env, compose.yaml e
 # compose.producao.yaml (+ segredos.env, gravado aqui). Pela entrada padrão o workflow manda três linhas:
@@ -66,7 +66,7 @@ echo "Deploy: $alvo @ $tag"
 
 # Segredos do GitHub → segredos.env (lido pela API com env_file format: raw). Se mudou, a API é
 # recriada mesmo num deploy só do frontend, para valer na hora.
-PERMITIDOS=" ADMIN_EMAIL ADMIN_NOME ADMIN_PASSWORD STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASS EMAIL_FROM EMAIL_REPLY_TO "
+PERMITIDOS=" ADMIN_EMAIL ADMIN_NOME ADMIN_PASSWORD STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET EMAIL_FROM EMAIL_REPLY_TO "
 segredos_mudaram=false
 if [ -n "$segredos" ]; then
   novo=$(mktemp)
