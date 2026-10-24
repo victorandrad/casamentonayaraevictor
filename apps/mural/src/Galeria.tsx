@@ -5,8 +5,21 @@ import { FotoImagem } from './FotoImagem';
 import { Lightbox } from './Lightbox';
 import './galeria.css';
 
-// Rhythm of shapes across the grid: tall arch, wide frame, plain frames.
-const formas = ['arco', 'normal', 'larga', 'normal', 'arco', 'normal'] as const;
+// Every card is the same square, so the grid has no gaps whatever the photos. Photos are shown a page
+// at a time: full rows for the number of columns the screen has (same breakpoints as galeria.css),
+// two rows, or three on phones.
+const colunas = () => (matchMedia('(max-width: 560px)').matches ? 2 : matchMedia('(max-width: 900px)').matches ? 3 : 4);
+
+function usePorPagina() {
+  const porPagina = () => (colunas() === 2 ? 6 : colunas() * 2);
+  const [n, setN] = useState(porPagina);
+  useEffect(() => {
+    const atualizar = () => setN(porPagina());
+    window.addEventListener('resize', atualizar);
+    return () => window.removeEventListener('resize', atualizar);
+  }, []);
+  return n;
+}
 
 const reduzMovimento = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -31,7 +44,10 @@ export default function Galeria() {
   const [fotos, setFotos] = useState<Foto[] | null>(null);
   const [filtro, setFiltro] = useState<Momento | 'todos'>('todos');
   const [aberta, setAberta] = useState<number | null>(null);
+  const [pagina, setPagina] = useState(0);
+  const POR_PAGINA = usePorPagina();
   const gatilho = useRef<HTMLElement | null>(null);
+  const topo = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     carregarFotos()
@@ -42,6 +58,16 @@ export default function Galeria() {
   const lista = useMemo(() => fotos ?? [], [fotos]);
   const visiveis = useMemo(() => (filtro === 'todos' ? lista : lista.filter((f) => f.momento === filtro)), [filtro, lista]);
   const disponiveis = momentos.filter((m) => m.id === 'todos' || lista.some((f) => f.momento === m.id));
+  const paginas = Math.max(1, Math.ceil(visiveis.length / POR_PAGINA));
+  const atual = Math.min(pagina, paginas - 1);
+  const daPagina = visiveis.slice(atual * POR_PAGINA, (atual + 1) * POR_PAGINA);
+
+  const irPara = (p: number) => {
+    setPagina(p);
+    // keep the grid in view when the page changes from the controls below it
+    const r = topo.current?.getBoundingClientRect();
+    if (r && r.top < 0) topo.current?.scrollIntoView({ behavior: reduzMovimento() ? 'auto' : 'smooth', block: 'start' });
+  };
 
   return (
     <section id="galeria" className="nv-section nv-section--alt">
@@ -61,7 +87,10 @@ export default function Galeria() {
                 key={m.id}
                 className={filtro === m.id ? 'galeria-filtro is-active' : 'galeria-filtro'}
                 aria-pressed={filtro === m.id}
-                onClick={() => setFiltro(m.id)}
+                onClick={() => {
+                  setFiltro(m.id);
+                  setPagina(0);
+                }}
               >
                 {m.label}
               </button>
@@ -69,18 +98,18 @@ export default function Galeria() {
           </div>
         )}
 
-        {/* key restarts the entrance animation when the filter changes */}
-        <div className="galeria-grid" key={filtro}>
-          {visiveis.map((foto, i) => (
+        {/* key restarts the entrance animation when the filter or the page changes */}
+        <div className="galeria-grid" key={`${filtro}-${atual}`} ref={topo}>
+          {daPagina.map((foto, i) => (
             <button
               key={foto.id}
-              className={`galeria-card galeria-card--${filtro === 'todos' ? formas[i % formas.length] : 'normal'}`}
+              className="galeria-card"
               style={{ animationDelay: `${i * 70}ms` }}
               onPointerMove={inclinar}
               onPointerLeave={endireitar}
               onClick={(e) => {
                 gatilho.current = e.currentTarget;
-                setAberta(i);
+                setAberta(atual * POR_PAGINA + i);
               }}
               aria-label={`Ampliar: ${foto.legenda || 'foto'}`}
             >
@@ -97,6 +126,28 @@ export default function Galeria() {
             </button>
           ))}
         </div>
+
+        {paginas > 1 && (
+          <nav className="galeria-paginas" aria-label="Páginas da galeria">
+            <button className="galeria-pagina galeria-pagina--seta" onClick={() => irPara(atual - 1)} disabled={atual === 0} aria-label="Página anterior">
+              ‹
+            </button>
+            {Array.from({ length: paginas }, (_, p) => (
+              <button
+                key={p}
+                className={p === atual ? 'galeria-pagina is-active' : 'galeria-pagina'}
+                onClick={() => irPara(p)}
+                aria-label={`Página ${p + 1}`}
+                aria-current={p === atual ? 'page' : undefined}
+              >
+                {p + 1}
+              </button>
+            ))}
+            <button className="galeria-pagina galeria-pagina--seta" onClick={() => irPara(atual + 1)} disabled={atual === paginas - 1} aria-label="Próxima página">
+              ›
+            </button>
+          </nav>
+        )}
 
         {lista.length > 0 && <p className="galeria-note">Toque em uma foto para ampliar.</p>}
       </div>
