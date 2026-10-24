@@ -1,5 +1,4 @@
-// Gift orders: creation from the cart, the payment page (Stripe Checkout or Mercado Pago Checkout
-// Pro, per config.gateway) and status sync.
+// Gift orders: creation from the cart, Stripe Checkout Sessions and status sync.
 import Stripe from 'stripe';
 import type { ItemPedido, PedidoAdmin, PedidoCriado, PedidoInput, PedidoPublico, StatusPedido } from '@nv/shared/types';
 import { precoComTaxa } from '@nv/shared/taxas';
@@ -7,12 +6,11 @@ import { config } from './config.ts';
 import { query, queryOne, transaction } from './db.ts';
 import { getTaxa, PRESENTE_SELECT, toPresente } from './repo.ts';
 import { enviarRecibo } from './email.ts';
-import * as mercadoPago from './mercadopago.ts';
 
 export const stripe = config.stripeSecretKey ? new Stripe(config.stripeSecretKey) : null;
 
-// Whether gifts can be paid right now with the configured gateway.
-export const pagamentoDisponivel = () => (config.gateway === 'mercadopago' ? mercadoPago.mercadoPagoConfigurado() : Boolean(stripe));
+// Whether gifts can be paid right now.
+export const pagamentoDisponivel = () => Boolean(stripe);
 
 export class PedidoInvalido extends Error {}
 
@@ -38,11 +36,10 @@ type PedidoRow = {
   liquido_centavos: number | null;
   recibo_enviado_em: Date | null;
   stripe_session_id: string | null;
-  gateway: 'stripe' | 'mercadopago';
 };
 
 const PEDIDO_COLS = `id, uid, status, nome, email, mensagem, total_centavos, subtotal_centavos, criado_em, pago_em,
-  stripe_payment_intent, forma_pagamento, bandeira, taxa_centavos, liquido_centavos, recibo_enviado_em, stripe_session_id, gateway`;
+  stripe_payment_intent, forma_pagamento, bandeira, taxa_centavos, liquido_centavos, recibo_enviado_em, stripe_session_id`;
 
 async function itensDoPedido(pedidoIds: number[]): Promise<Map<number, ItemPedido[]>> {
   const rows = await query<{ pedido_id: number; nome: string; quantidade: number; valor_centavos: number }>(
@@ -61,7 +58,6 @@ async function itensDoPedido(pedidoIds: number[]): Promise<Map<number, ItemPedid
 // Prices always come from the database, never from the browser.
 export async function criarPedido(input: PedidoInput): Promise<PedidoCriado> {
   if (!pagamentoDisponivel()) throw new Error('Pagamento não configurado');
-  const gateway = config.gateway;
 
   // Gifts come by their public UUID; the sequential id is only used inside this transaction.
   const quantidades = new Map<string, number>();
@@ -96,7 +92,6 @@ export async function criarPedido(input: PedidoInput): Promise<PedidoCriado> {
     // fee on top, computed here with the same rule the site uses to show prices.
     const itens = presentes.map((p) => ({
       id: idInterno.get(p.id)!,
-      uid: p.id,
       nome: p.nome,
       valor_centavos: p.valorCentavos,
       quantidade: Math.min(10, quantidades.get(p.id)!),
@@ -109,9 +104,9 @@ export async function criarPedido(input: PedidoInput): Promise<PedidoCriado> {
     }
 
     const inserido = await client.query<{ id: number; uid: string }>(
-      `INSERT INTO pedidos (nome, email, mensagem, total_centavos, subtotal_centavos, gateway)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, uid`,
-      [nome, email, mensagem, total, subtotal, gateway],
+      `INSERT INTO pedidos (nome, email, mensagem, total_centavos, subtotal_centavos)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id, uid`,
+      [nome, email, mensagem, total, subtotal],
     );
     const { id, uid } = inserido.rows[0]!;
     for (const i of itens) {
@@ -122,23 +117,6 @@ export async function criarPedido(input: PedidoInput): Promise<PedidoCriado> {
     }
     return { pedidoId: id, pedidoUid: uid, itens };
   });
-
-  if (gateway === 'mercadopago') {
-    let preferencia: { id: string; url: string };
-    try {
-      preferencia = await mercadoPago.criarPreferencia({
-        uid: pedidoUid,
-        nome,
-        email,
-        itens: itens.map((i) => ({ uid: i.uid, nome: i.nome, quantidade: i.quantidade, precoCentavos: i.preco_centavos })),
-      });
-    } catch (error) {
-      await query('DELETE FROM pedidos WHERE id = $1', [pedidoId]);
-      throw error;
-    }
-    await query('UPDATE pedidos SET mp_preferencia_id = $2 WHERE id = $1', [pedidoId, preferencia.id]);
-    return { url: preferencia.url, pedido: pedidoUid };
-  }
 
   const params: Stripe.Checkout.SessionCreateParams = {
     mode: 'payment',
@@ -260,16 +238,7 @@ export async function pedidoPorUid(uid: string): Promise<PedidoPublico | null> {
   let pedido = await buscar();
   if (!pedido) return null;
   const emAberto = pedido.status === 'pendente' || pedido.status === 'aguardando';
-  if (pedido.gateway === 'mercadopago' && emAberto && mercadoPago.mercadoPagoConfigurado()) {
-    try {
-      const pagamento = await mercadoPago.ultimoPagamentoDoPedido(uid);
-      if (pagamento) await aplicarPagamentoMercadoPago(pagamento);
-      pedido = (await buscar())!;
-    } catch {
-      // keep the stored status if Mercado Pago can't be reached
-    }
-  }
-  if (pedido.gateway === 'stripe' && stripe && pedido.stripe_session_id && emAberto) {
+  if (stripe && pedido.stripe_session_id && emAberto) {
     try {
       await sincronizarSessao(await stripe.checkout.sessions.retrieve(pedido.stripe_session_id));
       pedido = (await buscar())!;
@@ -305,7 +274,6 @@ export async function listarPedidos(): Promise<PedidoAdmin[]> {
   const itens = await itensDoPedido(pedidos.map((p) => p.id));
   return pedidos.map((p) => ({
     id: p.uid,
-    gateway: p.gateway,
     numero: numeroDoPedido(p.uid),
     status: p.status,
     nome: p.nome,
@@ -365,21 +333,6 @@ async function entregarRecibo(pedido: PedidoRow): Promise<boolean> {
 // Guest came back from Stripe without paying: expire the session so the gifts it
 // reserved are free again right away (instead of waiting for it to time out).
 export async function cancelarPedidoPendente(uid: string): Promise<void> {
-  const preferencia = await mercadoPago.preferenciaDoPedido(uid);
-  if (preferencia) {
-    // Close the Mercado Pago page first, then bring in a payment that may already exist (a Pix
-    // paid just before the guest pressed back), and only then free the gifts. If Mercado Pago
-    // can't be reached, the order stays as it is and its reservation runs out on its own.
-    try {
-      await mercadoPago.expirarPreferencia(preferencia);
-      const pagamento = await mercadoPago.ultimoPagamentoDoPedido(uid);
-      if (pagamento) await aplicarPagamentoMercadoPago(pagamento);
-    } catch {
-      return;
-    }
-    await mercadoPago.marcarExpirado(uid);
-    return;
-  }
   const pedido = await queryOne<{ stripe_session_id: string | null }>(
     "SELECT stripe_session_id FROM pedidos WHERE uid = $1 AND status = 'pendente'",
     [uid],
@@ -394,9 +347,3 @@ export async function cancelarPedidoPendente(uid: string): Promise<void> {
   }
 }
 
-// A Mercado Pago payment (from the webhook or the return page) brought into its order; the receipt
-// goes out in the background once it is paid.
-export async function aplicarPagamentoMercadoPago(pagamento: Parameters<typeof mercadoPago.sincronizarPagamento>[0]) {
-  const pagoAgora = await mercadoPago.sincronizarPagamento(pagamento);
-  if (pagoAgora) void enviarReciboDoPedido(pagoAgora);
-}

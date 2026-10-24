@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { EstadoVazio, NOME_GATEWAY } from '@nv/shared';
+import { EstadoVazio } from '@nv/shared';
 import { errorMessage, formatBRL } from '@nv/shared/api';
 import type { PedidoAdmin, StatusPedido } from '@nv/shared/types';
 import { adminApi, formatDate } from '../adminApi';
@@ -14,7 +14,6 @@ const statusLabel: Record<StatusPedido, string> = {
   pendente: 'No checkout',
   falhou: 'Falhou',
   expirado: 'Não concluído',
-  estornado: 'Estornado',
 };
 const badge: Record<StatusPedido, string> = {
   pago: 'sim',
@@ -22,10 +21,9 @@ const badge: Record<StatusPedido, string> = {
   pendente: 'pendente',
   falhou: 'nao',
   expirado: 'nao',
-  estornado: 'nao',
 };
 
-const nomesForma: Record<string, string> = { card: 'Cartão', pix: 'Pix', boleto: 'Boleto', link: 'Link', mercadopago: 'Saldo Mercado Pago' };
+const nomesForma: Record<string, string> = { card: 'Cartão', pix: 'Pix', boleto: 'Boleto', link: 'Link' };
 const nomeForma = (forma: string | null) => (forma ? (nomesForma[forma] ?? forma) : 'Outra');
 const capitalizar = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -98,8 +96,8 @@ export function Recebidos() {
         </button>
       </div>
       <p className="painel-hint">
-        Pagamentos feitos pelo Stripe ou pelo Mercado Pago. As taxas são as cobradas de verdade em cada pagamento, conforme
-        a forma usada (cartão, Pix…). O valor líquido cai na conta de vocês na plataforma e segue para o banco nos repasses.
+        Pagamentos feitos pelo Stripe. As taxas são as cobradas de verdade pelo Stripe em cada pagamento, conforme a forma
+        usada (cartão, Pix…). O valor líquido cai na conta Stripe e segue para o banco nos repasses.
       </p>
 
       {erro && (
@@ -118,14 +116,14 @@ export function Recebidos() {
             </div>
             <div className="painel-stat">
               <span className="painel-stat__value">{formatBRL(totais.taxa)}</span>
-              <span className="painel-stat__label">taxas do pagamento</span>
+              <span className="painel-stat__label">taxas do Stripe</span>
               <span className="painel-stat__hint">{percentual(totais.taxa, totais.bruto - pendentesBruto(pagos))} em média</span>
             </div>
             <div className="painel-stat painel-stat--destaque">
               <span className="painel-stat__value">{formatBRL(totais.liquido)}</span>
               <span className="painel-stat__label">líquido para vocês</span>
               {totais.pendentes > 0 && (
-                <span className="painel-stat__hint">{totais.pendentes} taxa(s) ainda sendo calculada(s)</span>
+                <span className="painel-stat__hint">{totais.pendentes} taxa(s) ainda sendo calculada(s) pelo Stripe</span>
               )}
             </div>
           </div>
@@ -206,7 +204,7 @@ export function Recebidos() {
               <div className="painel-item__title">
                 <strong>{p.nome}</strong>
                 <span className={`painel-badge painel-badge--${badge[p.status]}`}>{statusLabel[p.status]}</span>
-                {p.status === 'pago' && <span className="painel-forma">{descricaoForma(p)} · {NOME_GATEWAY[p.gateway]}</span>}
+                {p.status === 'pago' && <span className="painel-forma">{descricaoForma(p)}</span>}
               </div>
               <div className="painel-item__meta">
                 <span>Pedido #{p.numero}</span>
@@ -248,7 +246,7 @@ export function Recebidos() {
                     </span>
                   </>
                 ) : (
-                  <span className="painel-pedido-taxa">Taxa sendo calculada</span>
+                  <span className="painel-pedido-taxa">Taxa sendo calculada pelo Stripe</span>
                 ))}
             </div>
           </li>

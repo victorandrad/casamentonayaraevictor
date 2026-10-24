@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Icon, NOME_GATEWAY } from '@nv/shared';
+import { Icon } from '@nv/shared';
 import { errorMessage, formatBRL } from '@nv/shared/api';
-import type { Gateway } from '@nv/shared/types';
 import { MAX_QUANTIDADE, type ItemCarrinho } from './carrinho';
 import { criarPagamento, type Convidado } from './pagamento';
 
@@ -18,13 +17,6 @@ type Props = {
   onQuantidade: (id: string, quantidade: number) => void;
   onRemover: (id: string) => void;
   onFechar: () => void;
-  // Where the guest pays (Stripe or Mercado Pago), from the gift list.
-  gateway: Gateway;
-};
-
-const SELO: Record<Gateway, string> = {
-  stripe: 'Stripe, certificado PCI DSS nível 1',
-  mercadopago: 'Mercado Pago, certificado PCI DSS nível 1',
 };
 
 const emailValido = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
@@ -33,8 +25,8 @@ const TEMPO_MINIMO_AVISO = 1800;
 const esperar = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Gift checkout: review the cart, tell us who is giving, check the order, then
-// `criarPagamento` creates the order on the API and we redirect to the gateway's payment page.
-export function Checkout({ itens, total, onQuantidade, onRemover, onFechar, gateway }: Props) {
+// `criarPagamento` creates the order on the API and we redirect to Stripe Checkout.
+export function Checkout({ itens, total, onQuantidade, onRemover, onFechar }: Props) {
   const [etapa, setEtapa] = useState<Etapa>('carrinho');
   const [convidado, setConvidado] = useState<Convidado>({ nome: '', email: '', mensagem: '' });
   const [erroDados, setErroDados] = useState('');
@@ -120,7 +112,7 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar, gate
             </span>
             <h2 className="checkout__redirect-title">Indo para o ambiente seguro</h2>
             <p className="checkout__redirect-text">
-              Estamos levando você para a página de pagamento do {NOME_GATEWAY[gateway]}. Lá, seus dados são criptografados e protegidos;
+              Estamos levando você para a página de pagamento do Stripe. Lá, seus dados são criptografados e protegidos;
               o site do casamento não tem acesso aos dados do seu cartão ou do seu Pix.
             </p>
             <span className="checkout__redirect-dots" aria-hidden>
@@ -129,7 +121,7 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar, gate
               <i />
             </span>
             <p className="checkout__redirect-seal">
-              <Icon name="lock" size={14} /> Conexão segura · {SELO[gateway]}
+              <Icon name="lock" size={14} /> Conexão segura · Stripe, certificado PCI DSS nível 1
             </p>
           </div>
         )}
@@ -324,7 +316,7 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar, gate
               <div>
                 <strong>Pagamento em ambiente seguro</strong>
                 <p>
-                  Ao continuar, você será redirecionado para a página de pagamento do <b>{NOME_GATEWAY[gateway]}</b>, onde pode pagar
+                  Ao continuar, você será redirecionado para a página de pagamento do <b>Stripe</b>, onde pode pagar
                   com Pix ou cartão. Seus dados de pagamento ficam protegidos com criptografia e não passam pelo nosso
                   site nem ficam guardados conosco.
                 </p>

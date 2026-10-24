@@ -1,4 +1,3 @@
-import { config } from '../config.ts';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { ICONES_CATEGORIA } from '@nv/shared/categorias';
 import { IDS_MOMENTOS } from '@nv/shared/galeria';
@@ -530,11 +529,10 @@ export async function adminRoutes(app: FastifyInstance) {
   // Configurações
   const lerConfiguracoes = async (): Promise<Configuracoes> => ({
     taxa: await repo.getTaxa(),
-    gateway: config.gateway,
   });
   app.get('/configuracoes', lerConfiguracoes);
 
-  app.put<{ Body: Pick<Configuracoes, 'taxa'> }>(
+  app.put<{ Body: Configuracoes }>(
     '/configuracoes',
     {
       schema: {

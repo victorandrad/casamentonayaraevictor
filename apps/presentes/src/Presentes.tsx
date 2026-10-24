@@ -258,7 +258,6 @@ export default function Presentes() {
           onQuantidade={(id, quantidade) => carrinho.dispatch({ tipo: 'quantidade', id, quantidade })}
           onRemover={(id) => carrinho.dispatch({ tipo: 'remover', id })}
           onFechar={() => setCheckoutAberto(false)}
-          gateway={lista?.gateway ?? 'stripe'}
         />
       )}
     </section>

@@ -81,12 +81,12 @@ export function Resumo({ onIr }: { onIr: (aba: 'convidados' | 'recados' | 'prese
         <div className="painel-stats">
           <div className="painel-stat painel-stat--destaque">
             <span className="painel-stat__value">{formatBRL(data.totalRecebidoCentavos)}</span>
-            <span className="painel-stat__label">recebidos em presentes</span>
+            <span className="painel-stat__label">recebidos pelo Stripe</span>
           </div>
           <div className="painel-stat">
             <span className="painel-stat__value">{formatBRL(data.totalLiquidoCentavos)}</span>
             <span className="painel-stat__label">líquido após taxas</span>
-            <span className="painel-stat__hint">{formatBRL(data.totalTaxasCentavos)} em taxas do pagamento</span>
+            <span className="painel-stat__hint">{formatBRL(data.totalTaxasCentavos)} em taxas do Stripe</span>
           </div>
           <div className="painel-stat">
             <span className="painel-stat__value">{data.presentesRecebidos}</span>

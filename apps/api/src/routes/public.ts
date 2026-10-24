@@ -1,4 +1,3 @@
-import { config } from '../config.ts';
 import type { FastifyInstance } from 'fastify';
 import type { ListaPresentes, RecadoInput, RespostaInput } from '@nv/shared/types';
 import { rateLimiter } from '../auth.ts';
@@ -89,6 +88,5 @@ export async function publicRoutes(app: FastifyInstance) {
     categorias: await repo.listCategorias(),
     presentes: await repo.listPresentes(),
     taxa: await repo.getTaxa(),
-    gateway: config.gateway,
   }));
 }

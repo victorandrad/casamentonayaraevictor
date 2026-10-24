@@ -8,9 +8,8 @@
 # e os secrets/variables de produção abaixo, que o script grava em /opt/casamento/segredos.env.
 # Sem o secret VPS_SSH_KEY, o deploy é pulado com um aviso.
 #
-# Secrets:   VPS_SSH_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
-#            MERCADOPAGO_ACCESS_TOKEN, MERCADOPAGO_WEBHOOK_SECRET
-# Variables: ADMIN_NOME, EMAIL_FROM, EMAIL_REPLY_TO, PAGAMENTO_GATEWAY (stripe | mercadopago)
+# Secrets:   VPS_SSH_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+# Variables: ADMIN_NOME, EMAIL_FROM, EMAIL_REPLY_TO
 # (Os recibos saem pelo servidor de e-mail do próprio projeto: não há SMTP para configurar.)
 # Os vazios ficam de fora (a API usa o padrão dela).
 name: Deploy no VPS
@@ -62,9 +61,6 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-          MERCADOPAGO_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_ACCESS_TOKEN }}
-          MERCADOPAGO_WEBHOOK_SECRET: ${{ secrets.MERCADOPAGO_WEBHOOK_SECRET }}
-          PAGAMENTO_GATEWAY: ${{ vars.PAGAMENTO_GATEWAY }}
           ADMIN_NOME: ${{ vars.ADMIN_NOME }}
           EMAIL_FROM: ${{ vars.EMAIL_FROM }}
           EMAIL_REPLY_TO: ${{ vars.EMAIL_REPLY_TO }}
@@ -80,7 +76,6 @@ jobs:
           # Terceira linha: NOME=valor-em-base64 de cada valor preenchido, tudo em base64.
           segredos=$(
             for nome in ADMIN_EMAIL ADMIN_NOME ADMIN_PASSWORD STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET \
-                        MERCADOPAGO_ACCESS_TOKEN MERCADOPAGO_WEBHOOK_SECRET PAGAMENTO_GATEWAY \
                         EMAIL_FROM EMAIL_REPLY_TO; do
               valor=$(printenv "$nome" || true)
               [ -n "$valor" ] && printf '%s=%s\n' "$nome" "$(printf '%s' "$valor" | base64 -w0)"

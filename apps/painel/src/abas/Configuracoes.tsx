@@ -1,5 +1,4 @@
 import { useState, type FormEvent } from 'react';
-import { NOME_GATEWAY } from '@nv/shared';
 import { descreverTaxa, precoComTaxa } from '@nv/shared/taxas';
 import { formatBRL } from '@nv/shared/api';
 import { errorMessage } from '@nv/shared/api';
@@ -17,7 +16,7 @@ export function Configuracoes({ usuario }: { usuario: Usuario }) {
     e.preventDefault();
     if (!data) return;
     try {
-      setData(await adminApi<ConfigData>('/admin/configuracoes', { method: 'PUT', body: { taxa: data.taxa } }));
+      setData(await adminApi<ConfigData>('/admin/configuracoes', { method: 'PUT', body: data }));
       setErro('');
       setSalvo(true);
       setTimeout(() => setSalvo(false), 2500);
@@ -36,25 +35,19 @@ export function Configuracoes({ usuario }: { usuario: Usuario }) {
       )}
       <div className="painel-card painel-narrow">
         <h3 className="painel-h3">Formas de pagamento</h3>
-        {data && (
-          <p className="painel-hint">
-            Os convidados pagam com <strong>Pix</strong> ou <strong>cartão</strong> no ambiente seguro do{' '}
-            <strong>{NOME_GATEWAY[data.gateway]}</strong>, e o valor cai na conta de vocês lá.{' '}
-            {data.gateway === 'mercadopago'
-              ? 'Pix, cartão e saldo do Mercado Pago já vêm ativos no Checkout Pro; nada a cadastrar aqui.'
-              : 'As formas de pagamento são ativadas no painel do Stripe, em Configurações → Formas de pagamento.'}{' '}
-            A plataforma usada é definida no servidor (variável <code>PAGAMENTO_GATEWAY</code>).
-          </p>
-        )}
+        <p className="painel-hint">
+          Os convidados pagam com <strong>Pix</strong> ou <strong>cartão</strong> no ambiente seguro do Stripe, e o valor cai
+          na conta Stripe de vocês. Não é preciso cadastrar chave Pix aqui: as formas de pagamento são ativadas no painel do
+          Stripe, em Configurações → Formas de pagamento.
+        </p>
       </div>
 
       <form className="painel-card painel-narrow" onSubmit={salvar}>
         <h3 className="painel-h3">Taxa dos presentes</h3>
         <p className="painel-hint">
           Taxa do pagamento embutida no preço de cada presente. O cálculo é feito de trás para frente, para que, depois do
-          desconto da plataforma de pagamento, sobre exatamente o valor cadastrado. O padrão (5,99% + R$ 0,39) é a taxa de
-          cartão internacional do Stripe, o caso mais caro; no Mercado Pago, cartão com recebimento na hora custa 4,98%
-          (Pix, 0,99%), então o padrão cobre qualquer forma de pagamento.
+          desconto do Stripe, sobre exatamente o valor cadastrado. O padrão (5,99% + R$ 0,39) é a taxa de cartão
+          internacional, o caso mais caro, então qualquer forma de pagamento fica coberta.
         </p>
         <div className="painel-form-row">
           <div className="painel-field painel-field--sm">

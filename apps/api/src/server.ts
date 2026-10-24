@@ -10,7 +10,6 @@ import { authRoutes } from './routes/auth.ts';
 import { adminRoutes } from './routes/admin.ts';
 import { pedidosRoutes } from './routes/pedidos.ts';
 import { stripeWebhookRoutes } from './routes/stripe.ts';
-import { mercadoPagoWebhookRoutes } from './routes/mercadopago.ts';
 import { garantirPastaUploads, MAX_UPLOAD_BYTES, UPLOADS_PREFIX } from './uploads.ts';
 
 const app = Fastify({
@@ -60,7 +59,6 @@ app.get('/api/health', async () => {
 await app.register(publicRoutes, { prefix: '/api/public' });
 await app.register(pedidosRoutes, { prefix: '/api/public' });
 await app.register(stripeWebhookRoutes, { prefix: '/api/stripe' });
-await app.register(mercadoPagoWebhookRoutes, { prefix: '/api/mercadopago' });
 await app.register(authRoutes, { prefix: '/api/auth' });
 await app.register(adminRoutes, { prefix: '/api/admin' });
 

@@ -31,18 +31,6 @@ export const config = {
   siteUrl: (env.SITE_URL ?? 'http://localhost:4000').replace(/\/$/, ''),
   stripeSecretKey: env.STRIPE_SECRET_KEY ?? '',
   stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET ?? '',
-  // Mercado Pago (Checkout Pro): access token of the application (TEST-… in test mode, APP_USR-… live)
-  // and the secret that signs its webhook notifications.
-  mercadoPago: {
-    accessToken: env.MERCADOPAGO_ACCESS_TOKEN ?? '',
-    webhookSecret: env.MERCADOPAGO_WEBHOOK_SECRET ?? '',
-  },
-  // Which gateway new gift orders go through. Unset: Mercado Pago when its token is set, else Stripe.
-  gateway: (env.PAGAMENTO_GATEWAY === 'stripe' || env.PAGAMENTO_GATEWAY === 'mercadopago'
-    ? env.PAGAMENTO_GATEWAY
-    : env.MERCADOPAGO_ACCESS_TOKEN
-      ? 'mercadopago'
-      : 'stripe') as 'stripe' | 'mercadopago',
   // Uploaded gift photos (a Docker volume in production)
   uploadsDir: env.UPLOADS_DIR ?? join(import.meta.dirname, '..', 'uploads'),
   // Mail server config folder shared with docker-mailserver (mailboxes managed in the panel).
@@ -65,9 +53,3 @@ export const config = {
     replyTo: env.EMAIL_REPLY_TO ?? '',
   },
 };
-
-// Mercado Pago only notifies and redirects to public HTTPS addresses: in production, refuse to start
-// with a SITE_URL it can't reach rather than take orders that never get confirmed.
-if (config.isProduction && config.gateway === 'mercadopago' && config.mercadoPago.accessToken && !config.siteUrl.startsWith('https://')) {
-  throw new Error(`SITE_URL precisa ser público e em https para o Mercado Pago (está ${config.siteUrl}).`);
-}

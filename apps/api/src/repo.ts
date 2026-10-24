@@ -1,5 +1,4 @@
 // SQL access and row → API shape mapping.
-import { config } from './config.ts';
 import { randomInt } from 'node:crypto';
 import type {
   Categoria,
@@ -162,8 +161,7 @@ export async function resumo(): Promise<Resumo> {
       (SELECT coalesce(sum(total_centavos), 0) FROM pedidos WHERE status = 'pago') AS "totalRecebidoCentavos",
       (SELECT coalesce(sum(taxa_centavos), 0) FROM pedidos WHERE status = 'pago') AS "totalTaxasCentavos",
       (SELECT coalesce(sum(coalesce(liquido_centavos, total_centavos)), 0) FROM pedidos WHERE status = 'pago') AS "totalLiquidoCentavos"`);
-  const numeros = Object.fromEntries(Object.entries(row!).map(([k, v]) => [k, Number(v)]));
-  return { ...numeros, gateway: config.gateway } as Resumo;
+  return Object.fromEntries(Object.entries(row!).map(([k, v]) => [k, Number(v)])) as Resumo;
 }
 
 // ---- Recados ----

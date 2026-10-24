@@ -16,7 +16,6 @@ O site do nosso casamento: convite, confirmação de presença, lista de present
 ![Fastify](https://img.shields.io/badge/Fastify-Node_24-000000?logo=fastify&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL_17-4169e1?logo=postgresql&logoColor=white)
 ![Stripe](https://img.shields.io/badge/Stripe-Pix_e_cartão-635bff?logo=stripe&logoColor=white)
-![Mercado Pago](https://img.shields.io/badge/Mercado_Pago-Checkout_Pro-00b1ea?logo=mercadopago&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker_Compose-2496ed?logo=docker&logoColor=white)
 
 </div>
@@ -42,7 +41,7 @@ O site do nosso casamento: convite, confirmação de presença, lista de present
 - [Começando em 5 minutos](#comecando)
 - [Como o projeto é organizado](#organizacao)
 - [Recursos em detalhe](#recursos)
-- [Pagamentos (Stripe e Mercado Pago)](#pagamentos)
+- [Pagamentos (Stripe)](#pagamentos)
 - [E-mail](#email)
 - [Deploy](#deploy)
 - [Referência da API](#api)
@@ -185,18 +184,9 @@ O site tem um único visual claro. Ele declara um "tema escuro" que é a mesma p
 
 <a id="pagamentos"></a>
 
-## 💳 Pagamentos (Stripe e Mercado Pago)
+## 💳 Pagamentos (Stripe)
 
-O carrinho termina na página de pagamento de uma das duas plataformas, escolhida no servidor pela variável **`PAGAMENTO_GATEWAY`** (`mercadopago` ou `stripe`; vazia = Mercado Pago se houver token, senão Stripe). Trocar de uma para a outra não mexe no código: cada pedido guarda por qual plataforma passou, e o painel mostra isso em **Recebidos**.
-
-| | Stripe | Mercado Pago |
-| --- | --- | --- |
-| Página | Stripe Checkout | Checkout Pro |
-| Formas | Pix e cartão (ativadas no Dashboard) | Pix, cartão e saldo Mercado Pago |
-| Webhook | `/api/stripe/webhook` | `/api/mercadopago/webhook` (assinatura `x-signature` verificada) |
-| Variáveis | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET` |
-
-O fluxo abaixo é o mesmo nas duas; o diagrama usa o Stripe como exemplo:
+O carrinho termina no **Stripe Checkout**:
 
 ```mermaid
 sequenceDiagram
@@ -233,20 +223,6 @@ sequenceDiagram
 4. Teste:
    - **Cartão:** `4242 4242 4242 4242`, qualquer validade futura e CVC.
    - **Pix:** CPF `000.000.000-00` e *Simular digitalização*. O e-mail controla a simulação: `qualquer+succeed_immediately@exemplo.com` confirma na hora, `qualquer+expire_immediately@exemplo.com` expira, e um e-mail comum confirma em ~3 minutos.
-
-</details>
-
-<details>
-<summary><b>Configurar o Mercado Pago (Checkout Pro)</b></summary>
-
-1. Entre em https://www.mercadopago.com.br/developers/panel/app com a conta que vai receber os presentes e clique em **Criar aplicação**: nome "Casamento Nayara & Victor", tipo de solução **Pagamentos on-line**, produto **Checkout Pro**, e conclua.
-2. Na aplicação, abra **Credenciais de teste** e copie o **Access Token** (`TEST-…`) para `MERCADOPAGO_ACCESS_TOKEN` no `.env`.
-3. Em **Webhooks → Configurar notificações**, modo de teste: URL `https://casamentonayaraevictor.com.br/api/mercadopago/webhook`, evento **Pagamentos**, salvar. Copie a **assinatura secreta** para `MERCADOPAGO_WEBHOOK_SECRET`.
-4. Recrie a API (`docker compose up -d api`). Em desenvolvimento o webhook não alcança o `localhost`, mas a tela de volta consulta o pagamento direto no Mercado Pago.
-5. Teste com as [contas e cartões de teste](https://www.mercadopago.com.br/developers/pt/docs/checkout-pro/additional-content/your-integrations/test/cards): crie um **usuário de teste comprador** em *Contas de teste* e pague logado com ele (titular `APRO` aprova, `OTHE` recusa).
-6. **Produção:** em *Credenciais de produção* (é preciso ativá-las preenchendo os dados do negócio), use o Access Token `APP_USR-…` e configure o webhook no modo produção. Os valores vão nos secrets `MERCADOPAGO_ACCESS_TOKEN` e `MERCADOPAGO_WEBHOOK_SECRET` e, se quiser fixar a plataforma, na variable `PAGAMENTO_GATEWAY`.
-
-Taxas do Checkout Pro (recebimento na hora): cartão 4,98%, Pix 0,99%. A taxa padrão do painel (5,99% + R$ 0,39) cobre as duas; ajuste em **Configurações** se quiser.
 
 </details>
 
@@ -342,8 +318,6 @@ Em *Settings → Secrets and variables → Actions*. A cada deploy o job manda o
 | Secret | `VPS_SSH_KEY` | chave do deploy (presa ao `casamento-deploy`) |
 | Secret | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | dono do painel e a caixa de e-mail com esse endereço |
 | Secret | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe em modo real |
-| Secret | `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET` | Mercado Pago (Checkout Pro) |
-| Variable | `PAGAMENTO_GATEWAY` | `mercadopago` ou `stripe` (vazio = Mercado Pago se houver token) |
 | Variable | `ADMIN_NOME`, `EMAIL_FROM`, `EMAIL_REPLY_TO` | nome no painel e remetente dos e-mails |
 
 </details>
@@ -390,7 +364,7 @@ Em *Settings → Secrets and variables → Actions*. A cada deploy o job manda o
 | `GET/POST /api/public/recados` | público | mural (POST limitado a 5/hora por IP) |
 | `GET /api/public/presentes` · `POST /api/public/pedidos` | público | lista e compra de presentes |
 | `GET /api/public/galeria` | público | fotos do álbum |
-| `POST /api/stripe/webhook` · `POST /api/mercadopago/webhook` | Stripe · Mercado Pago | confirmação de pagamentos |
+| `POST /api/stripe/webhook` | Stripe | confirmação de pagamentos |
 | `POST /api/auth/login` · `logout` · `GET me` | — | sessão do painel |
 | `/api/auth/convite/:token` · `recuperar-senha` · `redefinir/:token` | — | convites e recuperação de senha |
 | `/api/admin/*` | noivos | painel (alguns só para o master) |
