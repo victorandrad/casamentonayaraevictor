@@ -16,63 +16,154 @@
 .galeria-filtro:hover { border-color: var(--nv-rose); color: var(--nv-rose-deep); }
 .galeria-filtro.is-active { background: var(--nv-rose); border-color: var(--nv-rose); color: #fff; box-shadow: 0 10px 22px -14px rgba(143, 84, 78, 0.8); }
 
-/* Grid: every card the same square, so it never leaves holes */
-.galeria-grid {
+/* ---- Retro photo album ---- */
+/* A linen cover in the site's dusty rose around soft paper pages; on wide screens it opens as a
+   spread with a gentle binding. */
+.album {
+  --album-capa: #d9b4aa;
+  --album-papel: #fbf5ec;
+  --album-tinta: var(--nv-rose-deep);
+  --album-canto: linear-gradient(135deg, #d6ab98, #b07f6c);
+  position: relative;
+  padding: 16px;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(255, 245, 240, 0.35), transparent 60%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(143, 84, 78, 0.06) 0 1px, transparent 1px 3px),
+    var(--album-capa);
+  box-shadow: 0 30px 60px -34px rgba(143, 84, 78, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.25), inset 0 0 22px rgba(143, 84, 78, 0.18);
+  perspective: 1600px;
+}
+/* stitching along the cover */
+.album::after {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border: 1px dashed rgba(255, 250, 245, 0.7);
+  pointer-events: none;
+}
+.album__pagina {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 22px;
+  gap: 44px 40px;
+  padding: 44px 46px 50px;
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 60%, rgba(197, 138, 131, 0.14) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .4 0 0 0 0 .32 0 0 0 .1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    var(--album-papel);
+  box-shadow: inset 0 0 30px rgba(197, 138, 131, 0.16);
+  transform-origin: left center;
+  animation: album-virar 0.75s var(--nv-ease) both;
 }
-@media (max-width: 900px) { .galeria-grid { grid-template-columns: repeat(3, 1fr); } }
-.galeria-card {
+/* binding down the middle of the spread */
+.album__pagina::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 46px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, rgba(143, 84, 78, 0.1) 42%, rgba(143, 84, 78, 0.2) 50%, rgba(143, 84, 78, 0.1) 58%, transparent);
+  pointer-events: none;
+}
+@keyframes album-virar {
+  from { opacity: 0; transform: rotateY(-14deg); }
+  to { opacity: 1; transform: none; }
+}
+@media (max-width: 900px) {
+  .album__pagina { grid-template-columns: repeat(3, 1fr); gap: 34px 28px; padding: 34px 30px 40px; }
+  .album__pagina::before { display: none; }
+}
+@media (max-width: 560px) {
+  .album { padding: 10px; }
+  .album::after { inset: 4px; }
+  .album__pagina { grid-template-columns: repeat(2, 1fr); gap: 26px 18px; padding: 24px 18px 30px; }
+}
+
+/* A photo: white print with a wider bottom margin for the handwritten caption, glued a bit crooked
+   and held by four dark corner mounts. */
+.album-foto {
   position: relative;
   padding: 0;
   border: none;
   background: none;
   cursor: zoom-in;
-  aspect-ratio: 1;
-  perspective: 900px;
-  animation: galeria-entra 0.7s var(--nv-ease) both;
+  transform: rotate(var(--giro, 0deg));
+  transition: transform 0.45s var(--nv-ease);
+  animation: album-colar 0.6s var(--nv-ease) both;
 }
-@media (max-width: 560px) {
-  .galeria-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
-  .galeria-card__frame { border-width: 5px; }
-  .galeria-card__caption { padding: 26px 10px 8px; }
-  .galeria-card__legenda { font-size: 20px; }
-  .galeria-card__zoom { display: none; }
+@keyframes album-colar {
+  from { opacity: 0; transform: rotate(var(--giro, 0deg)) translateY(10px) scale(0.96); }
+  to { opacity: 1; transform: rotate(var(--giro, 0deg)); }
 }
-@keyframes galeria-entra {
-  from { opacity: 0; transform: translateY(18px) scale(0.97); }
-  to { opacity: 1; transform: none; }
-}
-.galeria-card:focus-visible { outline: none; }
-.galeria-card:focus-visible .galeria-card__frame { box-shadow: 0 0 0 3px var(--nv-cream), 0 0 0 5px var(--nv-rose); }
-
-.galeria-card__frame {
-  position: relative;
+.album-foto:hover { transform: rotate(0deg) translateY(-4px) scale(1.03); z-index: 1; }
+.album-foto:focus-visible { outline: none; }
+.album-foto:focus-visible .album-foto__papel { box-shadow: 0 0 0 3px var(--album-papel), 0 0 0 5px var(--nv-rose); }
+.album-foto__papel {
   display: block;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  border: 7px solid var(--nv-card);
-  box-shadow: 0 0 0 1px var(--nv-blush-line), 0 22px 40px -28px rgba(143, 84, 78, 0.45);
-  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
-  transition: transform 0.6s var(--nv-ease), box-shadow 0.5s var(--nv-ease);
-  will-change: transform;
+  padding: 9px 9px 0;
+  background: #fffdf9;
+  box-shadow: 0 1px 1px rgba(143, 84, 78, 0.18), 0 10px 18px -12px rgba(143, 84, 78, 0.45);
+  transition: box-shadow 0.45s var(--nv-ease);
 }
-.galeria-card:hover .galeria-card__frame {
-  transition: transform 0.15s linear, box-shadow 0.5s var(--nv-ease);
-  box-shadow: 0 0 0 1px rgba(197, 138, 131, 0.5), 0 34px 50px -30px rgba(143, 84, 78, 0.6);
-}
-
-.galeria-card__img {
+.album-foto:hover .album-foto__papel { box-shadow: 0 1px 1px rgba(143, 84, 78, 0.15), 0 22px 30px -16px rgba(143, 84, 78, 0.5); }
+.album-foto__janela { position: relative; display: block; aspect-ratio: 1; overflow: hidden; background: var(--nv-blush-soft); }
+.album-foto__img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: 50% 30%; /* faces usually sit in the upper part */
   display: block;
-  transition: transform 1.2s var(--nv-ease), filter 0.8s var(--nv-ease);
+  filter: sepia(0.1) saturate(0.95);
+  transition: filter 0.6s var(--nv-ease);
 }
-.galeria-card:hover .galeria-card__img { transform: scale(1.07); filter: saturate(1.08); }
+.album-foto:hover .album-foto__img { filter: none; }
+.album-foto__zoom {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  background: rgba(251, 248, 241, 0.9);
+  color: var(--album-tinta);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.album-foto:hover .album-foto__zoom { opacity: 1; }
+.album-foto__legenda {
+  display: block;
+  min-height: 1.6em;
+  padding: 8px 4px 10px;
+  font-family: var(--nv-script);
+  font-size: 22px;
+  line-height: 1;
+  color: var(--album-tinta);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* photo corner mounts */
+.album-canto {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  background: var(--album-canto);
+  box-shadow: 0 1px 2px rgba(143, 84, 78, 0.3);
+}
+.album-canto--tl { top: -5px; left: -5px; clip-path: polygon(0 0, 100% 0, 0 100%); }
+.album-canto--tr { top: -5px; right: -5px; clip-path: polygon(0 0, 100% 0, 100% 100%); }
+.album-canto--bl { bottom: -5px; left: -5px; clip-path: polygon(0 0, 0 100%, 100% 100%); }
+.album-canto--br { bottom: -5px; right: -5px; clip-path: polygon(100% 0, 100% 100%, 0 100%); }
+@media (max-width: 560px) {
+  .album-foto__papel { padding: 6px 6px 0; }
+  .album-foto__legenda { font-size: 17px; padding: 6px 2px 8px; }
+  .album-canto { width: 16px; height: 16px; }
+}
 
 .galeria-placeholder {
   display: flex;
@@ -90,63 +181,16 @@
 }
 .galeria-placeholder span { color: var(--nv-taupe); }
 
-/* Soft light that follows the cursor */
-.galeria-card__shine {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0;
-  background: radial-gradient(circle at var(--gx, 50%) var(--gy, 50%), rgba(255, 255, 255, 0.45), transparent 55%);
-  transition: opacity 0.4s ease;
-}
-.galeria-card:hover .galeria-card__shine { opacity: 1; }
-
-/* Caption slides up on hover (always visible on touch screens) */
-.galeria-card__caption {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 40px 16px 14px;
-  background: linear-gradient(transparent, rgba(67, 56, 47, 0.55));
-  color: #fff;
-  text-align: left;
-  opacity: 0;
-  transform: translateY(12px);
-  transition: opacity 0.45s var(--nv-ease), transform 0.45s var(--nv-ease);
-}
-.galeria-card:hover .galeria-card__caption,
-.galeria-card:focus-visible .galeria-card__caption { opacity: 1; transform: none; }
-@media (hover: none) {
-  .galeria-card__caption { opacity: 1; transform: none; padding: 30px 12px 10px; }
-  .galeria-card__zoom { display: none; }
-}
-.galeria-card__legenda { font-family: var(--nv-script); font-size: 26px; line-height: 1; }
-.galeria-card__zoom {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-/* Pagination */
+/* Pagination, in the album's colours */
 .galeria-paginas { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 32px; }
 .galeria-pagina {
   min-width: 40px;
   height: 40px;
   padding: 0 12px;
-  border-radius: 999px;
   border: 1px solid var(--nv-blush-line);
-  background: rgba(255, 253, 251, 0.75);
-  font-family: var(--nv-sans);
-  font-size: 14px;
+  background: #fbf5ec;
+  font-family: var(--nv-serif);
+  font-size: 16px;
   color: var(--nv-text);
   cursor: pointer;
   transition: all 0.3s var(--nv-ease);
@@ -166,12 +210,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .galeria-card { animation: none; }
-  .galeria-card__frame,
-  .galeria-card__img { transition: none; transform: none !important; }
+  .album__pagina,
+  .album-foto { animation: none; transition: none; }
 }
 
-/* Lightbox */
+/* Lightbox: the album opened like a book */
 .lightbox {
   position: fixed;
   inset: 0;
@@ -180,9 +223,9 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
+  gap: 14px;
   padding: 56px 16px 20px;
-  background: rgba(54, 44, 37, 0.82);
+  background: rgba(92, 70, 62, 0.72);
   backdrop-filter: blur(8px);
   animation: lightbox-in 0.35s ease both;
 }
@@ -193,93 +236,138 @@
   right: 18px;
   width: 44px;
   height: 44px;
-  border-radius: 50%;
-  border: 1px solid rgba(246, 241, 234, 0.35);
-  background: rgba(246, 241, 234, 0.08);
+  border: 1px solid rgba(251, 245, 236, 0.45);
+  background: rgba(251, 245, 236, 0.1);
   color: var(--nv-cream);
   font-size: 26px;
   line-height: 1;
   cursor: pointer;
   transition: background 0.3s ease;
 }
-.lightbox__close:hover { background: rgba(246, 241, 234, 0.2); }
-
+.lightbox__close:hover { background: rgba(251, 245, 236, 0.22); }
 .lightbox__stage {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: min(1000px, 100%);
-  flex: 1;
-  min-height: 0;
+  gap: 18px;
+  max-width: 100%;
   touch-action: pan-y;
 }
-.lightbox__figure {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  max-height: 100%;
-}
-.lightbox__figure--prox { animation: lightbox-prox 0.5s var(--nv-ease) both; }
-.lightbox__figure--ant { animation: lightbox-ant 0.5s var(--nv-ease) both; }
-@keyframes lightbox-prox { from { opacity: 0; transform: translateX(40px) scale(0.98); } }
-@keyframes lightbox-ant { from { opacity: 0; transform: translateX(-40px) scale(0.98); } }
-.lightbox__img {
-  display: block;
-  max-width: min(86vw, 900px);
-  max-height: calc(100vh - 230px);
-  border: 8px solid var(--nv-card);
-  box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.6);
-  object-fit: contain;
-  user-select: none;
-}
-.lightbox__img.galeria-placeholder { display: flex; width: min(80vw, 640px); height: min(calc(100vh - 230px), 480px); font-size: 20px; }
-.lightbox__caption { display: flex; align-items: baseline; gap: 16px; color: var(--nv-cream); }
-.lightbox__legenda { font-family: var(--nv-script); font-size: 32px; }
-.lightbox__count { font-size: 12px; letter-spacing: 3px; color: #cbb9a7; }
-
 .lightbox__nav {
-  position: absolute;
-  top: 50%;
-  z-index: 1;
-  width: 48px;
-  height: 48px;
-  margin-top: -40px;
-  border-radius: 50%;
-  border: 1px solid rgba(246, 241, 234, 0.35);
-  background: rgba(246, 241, 234, 0.12);
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border: 1px solid rgba(251, 245, 236, 0.45);
+  background: rgba(251, 245, 236, 0.12);
   color: var(--nv-cream);
   font-size: 30px;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.3s ease, transform 0.3s var(--nv-ease);
+  transition: background 0.3s ease, opacity 0.3s ease;
 }
-.lightbox__nav:hover { background: rgba(246, 241, 234, 0.25); }
-.lightbox__nav--prev { left: 0; }
-.lightbox__nav--next { right: 0; }
-.lightbox__nav--prev:hover { transform: translateX(-3px); }
-.lightbox__nav--next:hover { transform: translateX(3px); }
+.lightbox__nav:hover:not(:disabled) { background: rgba(251, 245, 236, 0.26); }
+.lightbox__nav:disabled { opacity: 0.25; cursor: default; }
+.lightbox__count { margin: 0; font-family: var(--nv-serif); font-style: italic; font-size: 15px; color: #f3e6dc; letter-spacing: 1px; }
 @media (max-width: 720px) {
-  .lightbox__nav { top: auto; bottom: 0; margin: 0; }
+  .lightbox__stage { display: grid; grid-template-columns: auto auto; grid-template-areas: 'livro livro' 'ant prox'; justify-content: center; gap: 14px 28px; }
+  .livro { grid-area: livro; justify-self: center; }
+  .lightbox__nav--prev { grid-area: ant; justify-self: end; }
+  .lightbox__nav--next { grid-area: prox; justify-self: start; }
 }
 
-.lightbox__thumbs { display: flex; gap: 8px; max-width: 100%; overflow-x: auto; padding: 4px; }
-.lightbox__thumb {
+/* The book: a linen cover in dusty rose holding one or two paper pages */
+.livro {
+  --pw: min(38vw, calc((100vh - 180px) * 0.75));
+  --ph: calc(var(--pw) / 0.75);
   flex: none;
-  width: 58px;
-  height: 58px;
-  padding: 0;
-  border: 2px solid transparent;
-  overflow: hidden;
-  background: none;
-  opacity: 0.55;
-  cursor: pointer;
-  transition: opacity 0.3s ease, border-color 0.3s ease, transform 0.3s var(--nv-ease);
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(143, 84, 78, 0.06) 0 1px, transparent 1px 3px),
+    #d9b4aa;
+  box-shadow: 0 40px 80px -30px rgba(40, 20, 15, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
 }
-.lightbox__thumb:hover { opacity: 0.85; transform: translateY(-2px); }
-.lightbox__thumb.is-active { opacity: 1; border-color: var(--nv-blush); }
-.lightbox__thumb-img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.lightbox__thumb-img.galeria-placeholder { display: flex; gap: 0; font-size: 0; }
-.lightbox__thumb-img.galeria-placeholder svg { width: 18px; height: 18px; }
+.livro--simples { --pw: min(calc(100vw - 56px), calc((100vh - 230px) * 0.75)); }
+.livro__miolo { position: relative; display: flex; height: var(--ph); perspective: 2400px; transform-style: preserve-3d; }
+
+.livro-pagina {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--pw) * 0.045);
+  width: var(--pw);
+  height: var(--ph);
+  padding: 9% 10% 13%;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .4 0 0 0 0 .32 0 0 0 .1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    #fbf5ec;
+}
+/* the binding: each page darkens a little towards the spine */
+.livro-pagina--esq { box-shadow: inset -26px 0 30px -24px rgba(143, 84, 78, 0.35); }
+.livro-pagina--dir { box-shadow: inset 26px 0 30px -24px rgba(143, 84, 78, 0.35); }
+.livro-pagina__foto {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  padding: calc(var(--pw) * 0.025);
+  background: #fffdf9;
+  box-shadow: 0 1px 1px rgba(143, 84, 78, 0.18), 0 12px 20px -14px rgba(143, 84, 78, 0.5);
+}
+.livro-pagina__img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(var(--ph) * 0.6);
+  width: auto;
+  height: auto;
+  filter: sepia(0.08);
+  user-select: none;
+}
+.livro-pagina__img.galeria-placeholder { width: calc(var(--pw) * 0.7); height: calc(var(--pw) * 0.7); }
+.livro-pagina__legenda { min-height: 1em; font-family: var(--nv-script); font-size: calc(var(--pw) * 0.075); line-height: 1; color: var(--nv-rose-deep); text-align: center; }
+.livro-pagina__fim { font-size: calc(var(--pw) * 0.12); color: var(--nv-rose); opacity: 0.6; }
+.livro-pagina__numero { position: absolute; bottom: 4.5%; font-family: var(--nv-serif); font-style: italic; font-size: 13px; color: var(--nv-taupe); }
+.livro-pagina--esq .livro-pagina__numero { left: 9%; }
+.livro-pagina--dir .livro-pagina__numero { right: 9%; }
+
+/* The turning leaf: front is the page lifting, back the page that lands on the other side */
+.livro-folha {
+  position: absolute;
+  top: 0;
+  width: var(--pw);
+  height: var(--ph);
+  transform-style: preserve-3d;
+  animation-duration: 0.9s;
+  animation-timing-function: cubic-bezier(0.45, 0.05, 0.3, 1);
+  animation-fill-mode: both;
+}
+.livro-folha--prox { left: calc(100% - var(--pw)); transform-origin: left center; animation-name: livro-prox; }
+.livro-folha--ant { left: 0; transform-origin: right center; animation-name: livro-ant; }
+.livro-folha--sai { left: 0; animation-name: livro-sai; }
+.livro-folha--volta { left: 0; transform-origin: left center; animation-name: livro-volta; }
+@keyframes livro-prox { from { transform: rotateY(0); } to { transform: rotateY(-180deg); } }
+@keyframes livro-ant { from { transform: rotateY(0); } to { transform: rotateY(180deg); } }
+@keyframes livro-sai { from { transform: rotateY(0); opacity: 1; } 70% { opacity: 1; } to { transform: rotateY(-180deg); opacity: 0; } }
+@keyframes livro-volta { from { transform: rotateY(-180deg); opacity: 0; } 30% { opacity: 1; } to { transform: rotateY(0); opacity: 1; } }
+.livro-folha__face { position: absolute; inset: 0; backface-visibility: hidden; box-shadow: 0 10px 30px -12px rgba(60, 30, 20, 0.35); }
+.livro-folha__face--verso { transform: rotateY(180deg); }
+.livro-folha__face--liso { background: #f6eee2; }
+/* the page catches the light as it turns */
+.livro-folha__face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(143, 84, 78, 0.18), transparent 40%);
+  animation: livro-luz 0.9s ease-in-out both;
+}
+@keyframes livro-luz { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .livro-folha { animation-duration: 0.01s; }
+}
