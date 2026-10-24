@@ -24,6 +24,9 @@ export default defineConfig({
     meta: {
       description: 'Casamento de Nayara e Victor · 28 de agosto de 2027 · Itu, SP',
       'theme-color': '#f6f1ea',
+      // light design only: keeps forced dark modes (Samsung Internet, Chrome auto-dark) away
+      'color-scheme': 'only light',
+      'supported-color-schemes': 'light',
     },
     // Icons live in public/ (copied to the site root as-is). Rsbuild already
     // links public/favicon.svg on its own; these are the fallbacks and app icons.

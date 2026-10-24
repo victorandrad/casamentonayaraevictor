@@ -25,8 +25,17 @@
   --nv-script: 'Pinyon Script', cursive;
 }
 
+/* The site has a single light design. Declaring it light-only (and answering the dark media query
+   with the same colours) keeps browsers with a forced dark mode — Samsung Internet, Chrome's
+   auto-dark — from repainting the cream and rose palette in dark tones. */
+:root { color-scheme: only light; }
+@media (prefers-color-scheme: dark) {
+  :root { color-scheme: only light; }
+  html, body { background-color: var(--nv-cream); color: var(--nv-ink); }
+}
+
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; background-color: var(--nv-cream); }
 /* Keep section tops clear of the fixed nav when jumping to #anchors */
 section[id] { scroll-margin-top: 64px; }
 body {
