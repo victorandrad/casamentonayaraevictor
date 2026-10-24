@@ -29,9 +29,10 @@ export type Categoria = { id: number; nome: string; icone: string; ordem: number
 export type CategoriaInput = { nome: string; icone: string };
 // Whole list layout from the panel's drag-and-drop: categories in order, each
 // with its gifts in order.
-export type OrganizacaoLista = Array<{ id: number; presentes: number[] }>;
+export type OrganizacaoLista = Array<{ id: number; presentes: string[] }>;
 export type Presente = {
-  id: number;
+  // Public identifier (UUID): the sequential database id never leaves the API.
+  id: string;
   categoriaId: number;
   nome: string;
   valorCentavos: number;
@@ -44,7 +45,9 @@ export type Presente = {
   presenteados: number;
 };
 // `valorCentavos` of each gift is what the couple receives; guests pay it plus `taxa`.
-export type ListaPresentes = { categorias: Categoria[]; presentes: Presente[]; taxa: Taxa };
+// `gateway`: where guests pay (Stripe or Mercado Pago), chosen by the server's configuration.
+export type ListaPresentes = { categorias: Categoria[]; presentes: Presente[]; taxa: Taxa; gateway: Gateway };
+export type Gateway = 'stripe' | 'mercadopago';
 
 // Auth
 // `dono`: the panel owner (ADMIN_EMAIL), the only one who manages the other users.
@@ -87,6 +90,7 @@ export type Resumo = {
   totalRecebidoCentavos: number;
   totalTaxasCentavos: number;
   totalLiquidoCentavos: number;
+  gateway: Gateway;
 };
 export type ConvidadoAdmin = {
   id: number;
@@ -99,15 +103,16 @@ export type ConvidadoAdmin = {
 export type ConvidadoInput = { nome: string; limiteAcompanhantes: number };
 export type RecadoAdmin = Recado & { visivel: boolean };
 export type PresenteInput = Omit<Presente, 'id' | 'disponivel' | 'presenteados'>;
-export type Configuracoes = { taxa: Taxa };
+export type Configuracoes = { taxa: Taxa; gateway: Gateway };
 
 // Gift orders (Stripe Checkout)
-export type StatusPedido = 'pendente' | 'aguardando' | 'pago' | 'falhou' | 'expirado';
+export type StatusPedido = 'pendente' | 'aguardando' | 'pago' | 'falhou' | 'expirado' | 'estornado';
 export type PedidoInput = {
-  itens: Array<{ presenteId: number; quantidade: number }>;
+  itens: Array<{ presenteId: string; quantidade: number }>;
   convidado: { nome: string; email: string; mensagem: string };
 };
-export type PedidoCriado = { url: string };
+// `pedido`: the order's public UUID, the only order identifier the browser keeps.
+export type PedidoCriado = { url: string; pedido: string };
 export type ItemPedido = { nome: string; quantidade: number; valorCentavos: number };
 export type PedidoPublico = {
   status: StatusPedido;
@@ -117,7 +122,9 @@ export type PedidoPublico = {
   itens: ItemPedido[];
 };
 export type PedidoAdmin = PedidoPublico & {
-  id: number;
+  id: string; // public identifier (UUID)
+  gateway: Gateway;
+  numero: string; // short code shown to people (first part of the UUID)
   email: string;
   mensagem: string;
   criadoEm: string;

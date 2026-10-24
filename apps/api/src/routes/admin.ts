@@ -1,3 +1,4 @@
+import { config } from '../config.ts';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { ICONES_CATEGORIA } from '@nv/shared/categorias';
 import { IDS_MOMENTOS } from '@nv/shared/galeria';
@@ -13,6 +14,14 @@ const idParams = {
   type: 'object',
   required: ['id'],
   properties: { id: { type: 'integer', minimum: 1 } },
+} as const;
+
+// Gifts and orders are addressed by their public UUID (migration 012), never by the sequential id.
+const UUID = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
+const uidParams = {
+  type: 'object',
+  required: ['id'],
+  properties: { id: { type: 'string', pattern: UUID } },
 } as const;
 
 const convidadoBody = {
@@ -341,7 +350,7 @@ export async function adminRoutes(app: FastifyInstance) {
                 additionalProperties: false,
                 properties: {
                   id: { type: 'integer', minimum: 1 },
-                  presentes: { type: 'array', maxItems: 2000, items: { type: 'integer', minimum: 1 } },
+                  presentes: { type: 'array', maxItems: 2000, items: { type: 'string', pattern: UUID } },
                 },
               },
             },
@@ -394,9 +403,9 @@ export async function adminRoutes(app: FastifyInstance) {
     );
   });
 
-  app.put<{ Params: { id: number }; Body: PresenteInput }>(
+  app.put<{ Params: { id: string }; Body: PresenteInput }>(
     '/presentes/:id',
-    { schema: { params: idParams, body: presenteBody } },
+    { schema: { params: uidParams, body: presenteBody } },
     async (req, reply) => {
       const nome = req.body.nome.trim();
       if (!nome) return reply.code(400).send({ erro: 'Informe o nome do presente.' });
@@ -414,7 +423,7 @@ export async function adminRoutes(app: FastifyInstance) {
     },
   );
 
-  app.delete<{ Params: { id: number } }>('/presentes/:id', { schema: { params: idParams } }, async (req, reply) => {
+  app.delete<{ Params: { id: string } }>('/presentes/:id', { schema: { params: uidParams } }, async (req, reply) => {
     const anterior = (await repo.listPresentes()).find((p) => p.id === req.params.id);
     if (!(await repo.deletePresente(req.params.id))) return reply.code(404).send(notFound);
     await removerImagem(anterior?.fotoUrl);
@@ -512,7 +521,7 @@ export async function adminRoutes(app: FastifyInstance) {
   // Presentes recebidos (pedidos do Stripe)
   app.get('/pedidos', async () => listarPedidos());
 
-  app.post<{ Params: { id: number } }>('/pedidos/:id/recibo', { schema: { params: idParams } }, async (req, reply) =>
+  app.post<{ Params: { id: string } }>('/pedidos/:id/recibo', { schema: { params: uidParams } }, async (req, reply) =>
     (await enviarReciboDoPedido(req.params.id, { reenviar: true }))
       ? { enviado: true }
       : reply.code(400).send({ erro: 'Não foi possível enviar o recibo. Confira se o pedido está pago e o servidor de e-mail.' }),
@@ -521,10 +530,11 @@ export async function adminRoutes(app: FastifyInstance) {
   // Configurações
   const lerConfiguracoes = async (): Promise<Configuracoes> => ({
     taxa: await repo.getTaxa(),
+    gateway: config.gateway,
   });
   app.get('/configuracoes', lerConfiguracoes);
 
-  app.put<{ Body: Configuracoes }>(
+  app.put<{ Body: Pick<Configuracoes, 'taxa'> }>(
     '/configuracoes',
     {
       schema: {

@@ -404,25 +404,92 @@
 .retorno__text { font-size: 15px; line-height: 1.7; color: var(--nv-text); margin: 18px 0 20px; }
 .retorno__ok { margin-top: 6px; }
 
-.presentes-toast {
+/* Note after coming back from Stripe without paying. With gifts in the cart it sits right above the
+   floating cart, pointing down at it; otherwise it is centred at the bottom. */
+.presentes-aviso {
   position: fixed;
   left: 50%;
-  bottom: 22px;
+  bottom: max(22px, env(safe-area-inset-bottom));
   z-index: 59;
-  transform: translateX(-50%);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
-  max-width: calc(100% - 32px);
-  padding: 12px 14px 12px 18px;
-  border-radius: 999px;
-  background: var(--nv-ink);
-  color: var(--nv-cream);
-  font-size: 14px;
-  box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.5);
-  animation: nv-fade-up 0.4s var(--nv-ease) both;
+  width: min(360px, calc(100% - 32px));
+  padding: 14px 12px 14px 14px;
+  border: 1px solid var(--nv-blush-line);
+  border-radius: 18px;
+  background: rgba(253, 250, 247, 0.97);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 22px 44px -20px rgba(143, 84, 78, 0.55);
+  color: var(--nv-text);
+  transform: translateX(-50%);
+  animation: presentes-aviso-in 0.45s var(--nv-ease) both;
 }
-.presentes-toast button { background: none; border: none; color: inherit; font-size: 20px; line-height: 1; cursor: pointer; }
+@keyframes presentes-aviso-in { from { opacity: 0; transform: translate(-50%, 10px); } }
+.presentes-aviso--carrinho {
+  left: auto;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: calc(max(18px, env(safe-area-inset-bottom)) + 80px);
+  transform: none;
+  animation-name: presentes-aviso-in-carrinho;
+}
+@keyframes presentes-aviso-in-carrinho { from { opacity: 0; transform: translateY(10px); } }
+/* the little tail pointing at the cart */
+.presentes-aviso--carrinho::after {
+  content: '';
+  position: absolute;
+  right: 34px;
+  bottom: -7px;
+  width: 12px;
+  height: 12px;
+  border-right: 1px solid var(--nv-blush-line);
+  border-bottom: 1px solid var(--nv-blush-line);
+  background: rgb(253, 250, 247);
+  transform: rotate(45deg);
+}
+.presentes-aviso__icone {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--nv-blush);
+  color: var(--nv-rose-deep);
+}
+.presentes-aviso__texto { flex: 1; display: flex; flex-direction: column; gap: 3px; font-size: 13.5px; line-height: 1.5; }
+.presentes-aviso__texto strong { font-family: var(--nv-serif); font-weight: 400; font-size: 16px; color: var(--nv-ink); }
+.presentes-aviso__acao {
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--nv-sans);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--nv-rose-link);
+  cursor: pointer;
+}
+.presentes-aviso__acao:hover { color: var(--nv-rose-deep); }
+.presentes-aviso__fechar {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin: -4px -2px 0 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--nv-taupe);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.presentes-aviso__fechar:hover { background: var(--nv-blush-soft); color: var(--nv-ink); }
+@media (max-width: 480px) {
+  .presentes-aviso--carrinho { left: 16px; width: auto; }
+}
 .presentes-nota { margin: 10px 0 0; font-size: 12px; letter-spacing: 0.5px; color: var(--nv-taupe); }
 
 /* Gift availability */

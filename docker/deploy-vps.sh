@@ -66,7 +66,7 @@ echo "Deploy: $alvo @ $tag"
 
 # Segredos do GitHub → segredos.env (lido pela API com env_file format: raw). Se mudou, a API é
 # recriada mesmo num deploy só do frontend, para valer na hora.
-PERMITIDOS=" ADMIN_EMAIL ADMIN_NOME ADMIN_PASSWORD STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET EMAIL_FROM EMAIL_REPLY_TO "
+PERMITIDOS=" ADMIN_EMAIL ADMIN_NOME ADMIN_PASSWORD STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET MERCADOPAGO_ACCESS_TOKEN MERCADOPAGO_WEBHOOK_SECRET PAGAMENTO_GATEWAY EMAIL_FROM EMAIL_REPLY_TO "
 segredos_mudaram=false
 if [ -n "$segredos" ]; then
   novo=$(mktemp)

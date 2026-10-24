@@ -30,3 +30,6 @@ export const locais = {
       'https://maps.google.com/maps?q=Recanto%20Espelho%20da%20Lua%20R.%20Domingos%20Jos%C3%A9%20da%20Cruz%20420%20Jardim%20Itaguacu%20Salto%20SP&z=15&output=embed',
   },
 };
+
+// Display names of the payment gateways (Gateway in types.ts).
+export const NOME_GATEWAY = { stripe: 'Stripe', mercadopago: 'Mercado Pago' } as const;

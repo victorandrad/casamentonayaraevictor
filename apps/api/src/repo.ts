@@ -1,4 +1,5 @@
 // SQL access and row → API shape mapping.
+import { config } from './config.ts';
 import { randomInt } from 'node:crypto';
 import type {
   Categoria,
@@ -161,7 +162,8 @@ export async function resumo(): Promise<Resumo> {
       (SELECT coalesce(sum(total_centavos), 0) FROM pedidos WHERE status = 'pago') AS "totalRecebidoCentavos",
       (SELECT coalesce(sum(taxa_centavos), 0) FROM pedidos WHERE status = 'pago') AS "totalTaxasCentavos",
       (SELECT coalesce(sum(coalesce(liquido_centavos, total_centavos)), 0) FROM pedidos WHERE status = 'pago') AS "totalLiquidoCentavos"`);
-  return Object.fromEntries(Object.entries(row!).map(([k, v]) => [k, Number(v)])) as Resumo;
+  const numeros = Object.fromEntries(Object.entries(row!).map(([k, v]) => [k, Number(v)]));
+  return { ...numeros, gateway: config.gateway } as Resumo;
 }
 
 // ---- Recados ----
@@ -292,11 +294,11 @@ export async function organizarLista(lista: OrganizacaoLista): Promise<boolean> 
       `UPDATE categorias c SET ordem = o.pos FROM unnest($1::int[]) WITH ORDINALITY AS o(id, pos) WHERE c.id = o.id`,
       [ids],
     );
-    const presentes = lista.flatMap((c) => c.presentes.map((id, i) => ({ id, categoria: c.id, ordem: i + 1 })));
+    const presentes = lista.flatMap((c) => c.presentes.map((uid, i) => ({ id: uid, categoria: c.id, ordem: i + 1 })));
     await client.query(
       `UPDATE presentes p SET categoria_id = o.categoria, ordem = o.ordem
-         FROM unnest($1::int[], $2::int[], $3::int[]) AS o(id, categoria, ordem)
-        WHERE p.id = o.id`,
+         FROM unnest($1::uuid[], $2::int[], $3::int[]) AS o(uid, categoria, ordem)
+        WHERE p.uid = o.uid`,
       [presentes.map((p) => p.id), presentes.map((p) => p.categoria), presentes.map((p) => p.ordem)],
     );
     return true;
@@ -313,8 +315,11 @@ export async function categoriaExiste(id: number): Promise<boolean> {
 // created to expire after 30 minutes; a little slack covers clock differences.
 export const RESERVA_MINUTOS = 35;
 
+// `id` is the internal key (joins with pedido_itens); `uid` is the only identifier that leaves the
+// database — the site, the panel and the API know a gift by it (see migration 012).
 type PresenteRow = {
   id: number;
+  uid: string;
   categoria_id: number;
   nome: string;
   valor_centavos: number;
@@ -326,7 +331,7 @@ type PresenteRow = {
 
 // Paid units, plus units in checkouts that can still be paid (reserved).
 export const PRESENTE_SELECT = `
-  SELECT p.id, p.categoria_id, p.nome, p.valor_centavos, p.foto_url, p.quantidade_maxima,
+  SELECT p.id, p.uid, p.categoria_id, p.nome, p.valor_centavos, p.foto_url, p.quantidade_maxima,
          coalesce(v.presenteados, 0) AS presenteados, coalesce(v.reservados, 0) AS reservados
     FROM presentes p
     LEFT JOIN (
@@ -345,7 +350,7 @@ export const toPresente = (r: PresenteRow): Presente => {
   const presenteados = Number(r.presenteados);
   const reservados = Number(r.reservados);
   return {
-    id: r.id,
+    id: r.uid,
     categoriaId: r.categoria_id,
     nome: r.nome,
     valorCentavos: r.valor_centavos,
@@ -361,32 +366,32 @@ export async function listPresentes(): Promise<Presente[]> {
   return rows.map(toPresente);
 }
 
-async function getPresente(id: number): Promise<Presente | null> {
-  const row = await queryOne<PresenteRow>(`${PRESENTE_SELECT} WHERE p.id = $1`, [id]);
+async function getPresente(uid: string): Promise<Presente | null> {
+  const row = await queryOne<PresenteRow>(`${PRESENTE_SELECT} WHERE p.uid = $1`, [uid]);
   return row ? toPresente(row) : null;
 }
 
 export async function createPresente(input: PresenteInput): Promise<Presente> {
-  const row = await queryOne<{ id: number }>(
+  const row = await queryOne<{ uid: string }>(
     `INSERT INTO presentes (categoria_id, nome, valor_centavos, foto_url, quantidade_maxima, ordem)
      VALUES ($1, $2, $3, $4, $5, (SELECT coalesce(max(ordem), 0) + 1 FROM presentes WHERE categoria_id = $1))
-     RETURNING id`,
+     RETURNING uid`,
     [input.categoriaId, input.nome, input.valorCentavos, input.fotoUrl || null, input.quantidadeMaxima],
   );
-  return (await getPresente(row!.id))!;
+  return (await getPresente(row!.uid))!;
 }
 
-export async function updatePresente(id: number, input: PresenteInput): Promise<Presente | null> {
-  const row = await queryOne<{ id: number }>(
+export async function updatePresente(uid: string, input: PresenteInput): Promise<Presente | null> {
+  const row = await queryOne<{ uid: string }>(
     `UPDATE presentes SET categoria_id = $2, nome = $3, valor_centavos = $4, foto_url = $5, quantidade_maxima = $6
-      WHERE id = $1 RETURNING id`,
-    [id, input.categoriaId, input.nome, input.valorCentavos, input.fotoUrl || null, input.quantidadeMaxima],
+      WHERE uid = $1 RETURNING uid`,
+    [uid, input.categoriaId, input.nome, input.valorCentavos, input.fotoUrl || null, input.quantidadeMaxima],
   );
-  return row ? getPresente(id) : null;
+  return row ? getPresente(uid) : null;
 }
 
-export async function deletePresente(id: number): Promise<boolean> {
-  return (await query('DELETE FROM presentes WHERE id = $1 RETURNING id', [id])).length > 0;
+export async function deletePresente(uid: string): Promise<boolean> {
+  return (await query('DELETE FROM presentes WHERE uid = $1 RETURNING uid', [uid])).length > 0;
 }
 
 // ---- Galeria ----

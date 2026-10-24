@@ -1,18 +1,28 @@
-// Gift orders: creation from the cart, Stripe Checkout Sessions and status sync.
+// Gift orders: creation from the cart, the payment page (Stripe Checkout or Mercado Pago Checkout
+// Pro, per config.gateway) and status sync.
 import Stripe from 'stripe';
-import type { ItemPedido, PedidoAdmin, PedidoInput, PedidoPublico, StatusPedido } from '@nv/shared/types';
+import type { ItemPedido, PedidoAdmin, PedidoCriado, PedidoInput, PedidoPublico, StatusPedido } from '@nv/shared/types';
 import { precoComTaxa } from '@nv/shared/taxas';
 import { config } from './config.ts';
 import { query, queryOne, transaction } from './db.ts';
 import { getTaxa, PRESENTE_SELECT, toPresente } from './repo.ts';
 import { enviarRecibo } from './email.ts';
+import * as mercadoPago from './mercadopago.ts';
 
 export const stripe = config.stripeSecretKey ? new Stripe(config.stripeSecretKey) : null;
 
+// Whether gifts can be paid right now with the configured gateway.
+export const pagamentoDisponivel = () => (config.gateway === 'mercadopago' ? mercadoPago.mercadoPagoConfigurado() : Boolean(stripe));
+
 export class PedidoInvalido extends Error {}
+
+// Short code people see for an order (receipt, panel): the start of its UUID, so it says nothing
+// about how many orders exist.
+export const numeroDoPedido = (uid: string) => uid.slice(0, 8).toUpperCase();
 
 type PedidoRow = {
   id: number;
+  uid: string;
   status: StatusPedido;
   nome: string;
   email: string;
@@ -27,10 +37,12 @@ type PedidoRow = {
   taxa_centavos: number | null;
   liquido_centavos: number | null;
   recibo_enviado_em: Date | null;
+  stripe_session_id: string | null;
+  gateway: 'stripe' | 'mercadopago';
 };
 
-const PEDIDO_COLS = `id, status, nome, email, mensagem, total_centavos, subtotal_centavos, criado_em, pago_em,
-  stripe_payment_intent, forma_pagamento, bandeira, taxa_centavos, liquido_centavos, recibo_enviado_em`;
+const PEDIDO_COLS = `id, uid, status, nome, email, mensagem, total_centavos, subtotal_centavos, criado_em, pago_em,
+  stripe_payment_intent, forma_pagamento, bandeira, taxa_centavos, liquido_centavos, recibo_enviado_em, stripe_session_id, gateway`;
 
 async function itensDoPedido(pedidoIds: number[]): Promise<Map<number, ItemPedido[]>> {
   const rows = await query<{ pedido_id: number; nome: string; quantidade: number; valor_centavos: number }>(
@@ -47,10 +59,12 @@ async function itensDoPedido(pedidoIds: number[]): Promise<Map<number, ItemPedid
 }
 
 // Prices always come from the database, never from the browser.
-export async function criarPedido(input: PedidoInput): Promise<{ url: string }> {
-  if (!stripe) throw new Error('Stripe não configurado');
+export async function criarPedido(input: PedidoInput): Promise<PedidoCriado> {
+  if (!pagamentoDisponivel()) throw new Error('Pagamento não configurado');
+  const gateway = config.gateway;
 
-  const quantidades = new Map<number, number>();
+  // Gifts come by their public UUID; the sequential id is only used inside this transaction.
+  const quantidades = new Map<string, number>();
   for (const item of input.itens) quantidades.set(item.presenteId, (quantidades.get(item.presenteId) ?? 0) + item.quantidade);
 
   const ids = [...quantidades.keys()];
@@ -59,10 +73,11 @@ export async function criarPedido(input: PedidoInput): Promise<{ url: string }> 
 
   // Everything below runs in one transaction with the gift rows locked, so two
   // guests can't both take the last unit of a unique gift.
-  const { pedidoId, itens } = await transaction(async (client) => {
-    await client.query('SELECT id FROM presentes WHERE id = ANY($1) ORDER BY id FOR UPDATE', [ids]);
-    const { rows } = await client.query(`${PRESENTE_SELECT} WHERE p.id = ANY($1)`, [ids]);
+  const { pedidoId, pedidoUid, itens } = await transaction(async (client) => {
+    await client.query('SELECT id FROM presentes WHERE uid = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [ids]);
+    const { rows } = await client.query<Parameters<typeof toPresente>[0]>(`${PRESENTE_SELECT} WHERE p.uid = ANY($1::uuid[])`, [ids]);
     const presentes = rows.map(toPresente);
+    const idInterno = new Map(rows.map((r) => [r.uid, r.id]));
     if (presentes.length !== quantidades.size) {
       throw new PedidoInvalido('Algum presente do carrinho não está mais na lista. Atualize a página e tente de novo.');
     }
@@ -80,7 +95,8 @@ export async function criarPedido(input: PedidoInput): Promise<{ url: string }> 
     // Gift values are what the couple receives; each product is charged with the
     // fee on top, computed here with the same rule the site uses to show prices.
     const itens = presentes.map((p) => ({
-      id: p.id,
+      id: idInterno.get(p.id)!,
+      uid: p.id,
       nome: p.nome,
       valor_centavos: p.valorCentavos,
       quantidade: Math.min(10, quantidades.get(p.id)!),
@@ -92,27 +108,44 @@ export async function criarPedido(input: PedidoInput): Promise<{ url: string }> 
       throw new PedidoInvalido('O valor mínimo para presentear é R$ 1,00.');
     }
 
-    const inserido = await client.query<{ id: number }>(
-      `INSERT INTO pedidos (nome, email, mensagem, total_centavos, subtotal_centavos)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-      [nome, email, mensagem, total, subtotal],
+    const inserido = await client.query<{ id: number; uid: string }>(
+      `INSERT INTO pedidos (nome, email, mensagem, total_centavos, subtotal_centavos, gateway)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, uid`,
+      [nome, email, mensagem, total, subtotal, gateway],
     );
-    const id = inserido.rows[0]!.id;
+    const { id, uid } = inserido.rows[0]!;
     for (const i of itens) {
       await client.query(
         'INSERT INTO pedido_itens (pedido_id, presente_id, nome, valor_centavos, quantidade) VALUES ($1, $2, $3, $4, $5)',
         [id, i.id, i.nome, i.preco_centavos, i.quantidade],
       );
     }
-    return { pedidoId: id, itens };
+    return { pedidoId: id, pedidoUid: uid, itens };
   });
+
+  if (gateway === 'mercadopago') {
+    let preferencia: { id: string; url: string };
+    try {
+      preferencia = await mercadoPago.criarPreferencia({
+        uid: pedidoUid,
+        nome,
+        email,
+        itens: itens.map((i) => ({ uid: i.uid, nome: i.nome, quantidade: i.quantidade, precoCentavos: i.preco_centavos })),
+      });
+    } catch (error) {
+      await query('DELETE FROM pedidos WHERE id = $1', [pedidoId]);
+      throw error;
+    }
+    await query('UPDATE pedidos SET mp_preferencia_id = $2 WHERE id = $1', [pedidoId, preferencia.id]);
+    return { url: preferencia.url, pedido: pedidoUid };
+  }
 
   const params: Stripe.Checkout.SessionCreateParams = {
     mode: 'payment',
     locale: 'pt-BR',
     customer_email: email,
-    client_reference_id: String(pedidoId),
-    metadata: { pedido_id: String(pedidoId) },
+    client_reference_id: pedidoUid,
+    metadata: { pedido: pedidoUid },
     line_items: itens.map((i) => ({
       quantity: i.quantidade,
       price_data: { currency: 'brl', unit_amount: i.preco_centavos, product_data: { name: i.nome } },
@@ -120,10 +153,13 @@ export async function criarPedido(input: PedidoInput): Promise<{ url: string }> 
     // Short session so a reserved unique gift is released soon if the guest gives up
     // (30 minutes is Stripe's minimum).
     expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
-    success_url: `${config.siteUrl}/?pedido={CHECKOUT_SESSION_ID}#presentes`,
+    // The guest comes back with our order's UUID (not Stripe's session id): it's the only order
+    // identifier the browser ever sees or keeps.
+    success_url: `${config.siteUrl}/?pedido=${pedidoUid}#presentes`,
     cancel_url: `${config.siteUrl}/?pedido=cancelado#presentes`,
   };
 
+  if (!stripe) throw new Error('Stripe não configurado');
   let session: Stripe.Checkout.Session;
   try {
     session = await stripe.checkout.sessions.create(params);
@@ -135,7 +171,7 @@ export async function criarPedido(input: PedidoInput): Promise<{ url: string }> 
 
   await query('UPDATE pedidos SET stripe_session_id = $2 WHERE id = $1', [pedidoId, session.id]);
   if (!session.url) throw new Error('Stripe não retornou a URL do Checkout');
-  return { url: session.url };
+  return { url: session.url, pedido: pedidoUid };
 }
 
 // Maps a Checkout Session to our status. A paid order never goes back.
@@ -217,16 +253,25 @@ export async function registrarEvento(id: string, tipo: string): Promise<boolean
   return row !== null;
 }
 
-// Used by the thank-you screen. The session id (cs_…) is unguessable, so it
-// works as the guest's access token. If the webhook hasn't arrived yet, ask Stripe.
-export async function pedidoPorSessao(sessionId: string): Promise<PedidoPublico | null> {
-  const buscar = () =>
-    queryOne<PedidoRow>(`SELECT ${PEDIDO_COLS} FROM pedidos WHERE stripe_session_id = $1`, [sessionId]);
+// Used by the thank-you screen. The order's UUID is unguessable, so it works as the guest's
+// access token. If the webhook hasn't arrived yet, ask Stripe.
+export async function pedidoPorUid(uid: string): Promise<PedidoPublico | null> {
+  const buscar = () => queryOne<PedidoRow>(`SELECT ${PEDIDO_COLS} FROM pedidos WHERE uid = $1`, [uid]);
   let pedido = await buscar();
   if (!pedido) return null;
-  if (stripe && (pedido.status === 'pendente' || pedido.status === 'aguardando')) {
+  const emAberto = pedido.status === 'pendente' || pedido.status === 'aguardando';
+  if (pedido.gateway === 'mercadopago' && emAberto && mercadoPago.mercadoPagoConfigurado()) {
     try {
-      await sincronizarSessao(await stripe.checkout.sessions.retrieve(sessionId));
+      const pagamento = await mercadoPago.ultimoPagamentoDoPedido(uid);
+      if (pagamento) await aplicarPagamentoMercadoPago(pagamento);
+      pedido = (await buscar())!;
+    } catch {
+      // keep the stored status if Mercado Pago can't be reached
+    }
+  }
+  if (pedido.gateway === 'stripe' && stripe && pedido.stripe_session_id && emAberto) {
+    try {
+      await sincronizarSessao(await stripe.checkout.sessions.retrieve(pedido.stripe_session_id));
       pedido = (await buscar())!;
     } catch {
       // keep the stored status if Stripe can't be reached
@@ -259,7 +304,9 @@ export async function listarPedidos(): Promise<PedidoAdmin[]> {
   }
   const itens = await itensDoPedido(pedidos.map((p) => p.id));
   return pedidos.map((p) => ({
-    id: p.id,
+    id: p.uid,
+    gateway: p.gateway,
+    numero: numeroDoPedido(p.uid),
     status: p.status,
     nome: p.nome,
     email: p.email,
@@ -280,18 +327,24 @@ export async function listarPedidos(): Promise<PedidoAdmin[]> {
 // Sends the guest's receipt e-mail once. The row is claimed first (so a webhook
 // delivered twice can't send two e-mails) and released again if sending fails.
 // `reenviar` lets the couple send it again from the panel.
-export async function enviarReciboDoPedido(pedidoId: number, { reenviar = false } = {}): Promise<boolean> {
-  const pedido = await queryOne<PedidoRow>(
+// `pedido` is the internal id (webhook) or the public UUID (panel's "Reenviar recibo").
+export async function enviarReciboDoPedido(pedido: number | string, { reenviar = false } = {}): Promise<boolean> {
+  const coluna = typeof pedido === 'string' ? 'uid' : 'id';
+  const linha = await queryOne<PedidoRow>(
     `UPDATE pedidos SET recibo_enviado_em = now()
-      WHERE id = $1 AND status = 'pago' ${reenviar ? '' : 'AND recibo_enviado_em IS NULL'}
+      WHERE ${coluna} = $1 AND status = 'pago' ${reenviar ? '' : 'AND recibo_enviado_em IS NULL'}
       RETURNING ${PEDIDO_COLS}`,
-    [pedidoId],
+    [pedido],
   );
-  if (!pedido) return false;
+  return linha ? entregarRecibo(linha) : false;
+}
+
+async function entregarRecibo(pedido: PedidoRow): Promise<boolean> {
+  const pedidoId = pedido.id;
   try {
     const itens = (await itensDoPedido([pedido.id])).get(pedido.id) ?? [];
     await enviarRecibo({
-      numero: pedido.id,
+      numero: numeroDoPedido(pedido.uid),
       nome: pedido.nome,
       email: pedido.email,
       mensagem: pedido.mensagem,
@@ -300,27 +353,50 @@ export async function enviarReciboDoPedido(pedidoId: number, { reenviar = false 
       formaPagamento: pedido.forma_pagamento,
       pagoEm: pedido.pago_em ?? new Date(),
     });
-    console.info(`recibo do pedido ${pedido.id} enviado para ${pedido.email}`);
+    console.info(`recibo do pedido ${pedido.uid} enviado para ${pedido.email}`);
     return true;
   } catch (error) {
     await query('UPDATE pedidos SET recibo_enviado_em = NULL WHERE id = $1', [pedidoId]);
-    console.warn(`falha ao enviar o recibo do pedido ${pedidoId}:`, (error as Error).message);
+    console.warn(`falha ao enviar o recibo do pedido ${pedido.uid}:`, (error as Error).message);
     return false;
   }
 }
 
 // Guest came back from Stripe without paying: expire the session so the gifts it
 // reserved are free again right away (instead of waiting for it to time out).
-export async function cancelarPedidoPendente(sessionId: string): Promise<void> {
-  const pedido = await queryOne<{ id: number }>(
-    "SELECT id FROM pedidos WHERE stripe_session_id = $1 AND status = 'pendente'",
-    [sessionId],
+export async function cancelarPedidoPendente(uid: string): Promise<void> {
+  const preferencia = await mercadoPago.preferenciaDoPedido(uid);
+  if (preferencia) {
+    // Close the Mercado Pago page first, then bring in a payment that may already exist (a Pix
+    // paid just before the guest pressed back), and only then free the gifts. If Mercado Pago
+    // can't be reached, the order stays as it is and its reservation runs out on its own.
+    try {
+      await mercadoPago.expirarPreferencia(preferencia);
+      const pagamento = await mercadoPago.ultimoPagamentoDoPedido(uid);
+      if (pagamento) await aplicarPagamentoMercadoPago(pagamento);
+    } catch {
+      return;
+    }
+    await mercadoPago.marcarExpirado(uid);
+    return;
+  }
+  const pedido = await queryOne<{ stripe_session_id: string | null }>(
+    "SELECT stripe_session_id FROM pedidos WHERE uid = $1 AND status = 'pendente'",
+    [uid],
   );
-  if (!pedido || !stripe) return;
+  if (!pedido?.stripe_session_id || !stripe) return;
+  const sessionId = pedido.stripe_session_id;
   try {
     await sincronizarSessao(await stripe.checkout.sessions.expire(sessionId));
   } catch {
     // Already completed or expired on Stripe's side: just sync what it says.
     await sincronizarSessao(await stripe.checkout.sessions.retrieve(sessionId)).catch(() => {});
   }
+}
+
+// A Mercado Pago payment (from the webhook or the return page) brought into its order; the receipt
+// goes out in the background once it is paid.
+export async function aplicarPagamentoMercadoPago(pagamento: Parameters<typeof mercadoPago.sincronizarPagamento>[0]) {
+  const pagoAgora = await mercadoPago.sincronizarPagamento(pagamento);
+  if (pagoAgora) void enviarReciboDoPedido(pagoAgora);
 }

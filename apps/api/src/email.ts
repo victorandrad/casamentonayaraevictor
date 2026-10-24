@@ -12,7 +12,7 @@ const transporte = nodemailer.createTransport({
 });
 
 export type EmailRecibo = {
-  numero: number;
+  numero: string;
   nome: string;
   email: string;
   mensagem: string;
@@ -32,7 +32,7 @@ export async function enviarRecibo(r: EmailRecibo) {
   const primeiroNome = r.nome.split(' ')[0];
   const data = r.pagoEm.toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Sao_Paulo' });
   const forma = r.formaPagamento ? (nomesForma[r.formaPagamento] ?? r.formaPagamento) : null;
-  const numero = `#${String(r.numero).padStart(5, '0')}`;
+  const numero = `#${r.numero}`;
 
   const linhas = r.itens
     .map(

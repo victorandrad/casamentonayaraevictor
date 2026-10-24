@@ -4,13 +4,14 @@ import { errorMessage, formatBRL } from '@nv/shared/api';
 import type { PedidoPublico } from '@nv/shared/types';
 import { consultarPedido } from './pagamento';
 
-type Props = { sessionId: string; onConcluido: () => void; onFechar: () => void };
+// `uid`: the order's public UUID from the return URL.
+type Props = { uid: string; onConcluido: () => void; onFechar: () => void };
 
 const TENTATIVAS = 6;
 
 // Shown when Stripe sends the guest back. Polls briefly because the payment
 // confirmation (webhook) can land a few seconds after the redirect.
-export function RetornoPagamento({ sessionId, onConcluido, onFechar }: Props) {
+export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
   const [pedido, setPedido] = useState<PedidoPublico | null>(null);
   const [erro, setErro] = useState('');
 
@@ -19,7 +20,7 @@ export function RetornoPagamento({ sessionId, onConcluido, onFechar }: Props) {
     let timer: ReturnType<typeof setTimeout>;
     const buscar = async (tentativa: number) => {
       try {
-        const p = await consultarPedido(sessionId);
+        const p = await consultarPedido(uid);
         if (!ativo) return;
         setPedido(p);
         if (p.status === 'pago' || p.status === 'aguardando') onConcluido();
@@ -33,7 +34,7 @@ export function RetornoPagamento({ sessionId, onConcluido, onFechar }: Props) {
       ativo = false;
       clearTimeout(timer);
     };
-  }, [sessionId]);
+  }, [uid]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onFechar();
@@ -92,7 +93,7 @@ export function RetornoPagamento({ sessionId, onConcluido, onFechar }: Props) {
               </p>
             )}
             {(!status || status === 'pendente') && (
-              <p className="retorno__text">Estamos aguardando a confirmação do Stripe. Isso leva só alguns segundos.</p>
+              <p className="retorno__text">Estamos aguardando a confirmação do pagamento. Isso leva só alguns segundos.</p>
             )}
 
             {pedido && pedido.itens.length > 0 && (

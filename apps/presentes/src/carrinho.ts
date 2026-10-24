@@ -2,23 +2,36 @@ import { useEffect, useReducer } from 'react';
 import type { Presente } from '@nv/shared/types';
 
 // `maximo`: units still available for this gift (null = unlimited, e.g. cotas).
-export type ItemCarrinho = { id: number; nome: string; valorCentavos: number; quantidade: number; maximo: number | null };
+export type ItemCarrinho = { id: string; nome: string; valorCentavos: number; quantidade: number; maximo: number | null };
 
 type Acao =
   | { tipo: 'adicionar'; presente: Presente }
-  | { tipo: 'quantidade'; id: number; quantidade: number }
-  | { tipo: 'remover'; id: number }
+  | { tipo: 'quantidade'; id: string; quantidade: number }
+  | { tipo: 'remover'; id: string }
   | { tipo: 'sincronizar'; presentes: Presente[] }
   | { tipo: 'limpar' };
 
 const STORAGE_KEY = 'nv_carrinho_presentes';
 export const MAX_QUANTIDADE = 10;
 
-// The cart is a per-visitor convenience kept in this browser only.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// The cart is a per-visitor convenience kept in this browser only, and the browser can be edited by
+// anyone. So only which gifts and how many are saved, checked on the way back in; name, price and
+// availability always come from the API (the 'sincronizar' action, as soon as the list loads), and
+// the API recalculates everything again when the order is created.
+type ItemSalvo = { id: string; quantidade: number };
+
 function carregar(): ItemCarrinho[] {
   try {
-    const salvo = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
-    return Array.isArray(salvo) ? salvo.map((i) => ({ maximo: null, ...i })) : [];
+    const salvo: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
+    if (!Array.isArray(salvo)) return [];
+    return salvo
+      .filter(
+        (i): i is ItemSalvo =>
+          typeof i?.id === 'string' && UUID.test(i.id) && Number.isInteger(i.quantidade) && i.quantidade >= 1 && i.quantidade <= MAX_QUANTIDADE,
+      )
+      .map(({ id, quantidade }) => ({ id, quantidade, nome: '', valorCentavos: 0, maximo: null }));
   } catch {
     return [];
   }
@@ -63,7 +76,8 @@ export function useCarrinho() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(itens));
+      const salvar: ItemSalvo[] = itens.map(({ id, quantidade }) => ({ id, quantidade }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(salvar));
     } catch {
       // storage blocked: the cart still works for this visit
     }

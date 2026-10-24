@@ -12,42 +12,55 @@ export async function criarPagamento(pedido: Pedido): Promise<string> {
     itens: pedido.itens.map((i) => ({ presenteId: i.id, quantidade: i.quantidade })),
     convidado: pedido.convidado,
   };
-  const { url } = await api<PedidoCriado>('/public/pedidos', { method: 'POST', body });
-  const sessao = url.match(/cs_[A-Za-z0-9_]+/)?.[0];
+  const criado = await api<PedidoCriado>('/public/pedidos', { method: 'POST', body });
   try {
-    if (sessao) sessionStorage.setItem(SESSAO_PENDENTE, sessao);
+    sessionStorage.setItem(PEDIDO_PENDENTE, criado.pedido);
   } catch {
     // storage blocked: the reservation simply times out on its own
   }
-  return url;
+  return criado.url;
 }
 
-const SESSAO_PENDENTE = 'nv_sessao_stripe_pendente';
+// Only the order's UUID is kept in the browser (never Stripe's session id).
+const PEDIDO_PENDENTE = 'nv_pedido_pendente';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // The guest came back without paying (cancelled, or the browser's back button):
-// release the gifts that checkout reserved. `exceto` is a session that was paid.
-export async function cancelarPagamentoPendente(exceto?: string): Promise<boolean> {
-  let sessao: string | null;
+// release the gifts that checkout reserved. `exceto` is an order that was paid.
+//
+// The list must only load after the release has finished: until then the guest's own reservation
+// makes a unique gift look taken, and syncing the cart would drop it. A call made while one is
+// still running (React runs effects twice in development) waits for that same release instead of
+// finding nothing to cancel and loading the list too early.
+let liberando: Promise<boolean> | null = null;
+
+export function cancelarPagamentoPendente(exceto?: string): Promise<boolean> {
+  if (liberando) return liberando;
+  let pedido: string | null;
   try {
-    sessao = sessionStorage.getItem(SESSAO_PENDENTE);
-    sessionStorage.removeItem(SESSAO_PENDENTE);
+    pedido = sessionStorage.getItem(PEDIDO_PENDENTE);
+    sessionStorage.removeItem(PEDIDO_PENDENTE);
   } catch {
-    return false;
+    return Promise.resolve(false);
   }
-  if (!sessao || sessao === exceto) return false;
-  await api(`/public/pedidos/${encodeURIComponent(sessao)}/cancelar`, { method: 'POST' }).catch(() => {});
-  return true;
+  if (!pedido || !UUID.test(pedido) || pedido === exceto) return Promise.resolve(false);
+  liberando = api(`/public/pedidos/${pedido}/cancelar`, { method: 'POST' })
+    .then(() => true)
+    .catch(() => true)
+    .finally(() => {
+      liberando = null;
+    });
+  return liberando;
 }
 
-export const consultarPedido = (sessionId: string) =>
-  api<PedidoPublico>(`/public/pedidos/${encodeURIComponent(sessionId)}`);
+export const consultarPedido = (pedido: string) => api<PedidoPublico>(`/public/pedidos/${pedido}`);
 
-// Stripe sends the guest back to /?pedido=<session id> (or =cancelado).
-export function lerRetornoDoStripe(): { tipo: 'sucesso'; sessionId: string } | { tipo: 'cancelado' } | null {
+// Stripe sends the guest back to /?pedido=<order UUID> (or =cancelado).
+export function lerRetornoDoStripe(): { tipo: 'sucesso'; pedido: string } | { tipo: 'cancelado' } | null {
   const valor = new URLSearchParams(location.search).get('pedido');
   if (!valor) return null;
   if (valor === 'cancelado') return { tipo: 'cancelado' };
-  return /^cs_[A-Za-z0-9_]+$/.test(valor) ? { tipo: 'sucesso', sessionId: valor } : null;
+  return UUID.test(valor) ? { tipo: 'sucesso', pedido: valor } : null;
 }
 
 export function limparRetornoDaUrl() {

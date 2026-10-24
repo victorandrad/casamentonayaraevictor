@@ -28,12 +28,14 @@ import { adminApi } from '../adminApi';
 
 // Drag ids: categories are "c:<id>", gifts "p:<id>", a category's gift area "l:<id>".
 const idCategoria = (id: number) => `c:${id}`;
-const idPresente = (id: number) => `p:${id}`;
+const idPresente = (id: string) => `p:${id}`;
 const idArea = (id: number) => `l:${id}`;
 const tipo = (id: UniqueIdentifier) => String(id).slice(0, 1);
-const numero = (id: UniqueIdentifier) => Number(String(id).slice(2));
+// Gifts are known by their UUID (chave); categories and their areas by a number.
+const chave = (id: UniqueIdentifier) => String(id).slice(2);
+const numero = (id: UniqueIdentifier) => Number(chave(id));
 
-type Layout = { ordem: number[]; itens: Record<number, number[]> };
+type Layout = { ordem: number[]; itens: Record<number, string[]> };
 
 const layoutDe = (categorias: Categoria[], presentes: Presente[]): Layout => ({
   ordem: categorias.map((c) => c.id),
@@ -85,7 +87,7 @@ export function OrganizarLista({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const categoriaDoPresente = (l: Layout, presenteId: number) => l.ordem.find((c) => l.itens[c].includes(presenteId));
+  const categoriaDoPresente = (l: Layout, presenteId: string) => l.ordem.find((c) => l.itens[c].includes(presenteId));
 
   const salvar = async (novo: Layout) => {
     setEstado('salvando');
@@ -111,12 +113,12 @@ export function OrganizarLista({
   const aoPassar = ({ active, over }: DragOverEvent) => {
     if (!over || tipo(active.id) !== 'p') return;
     setLayout((l) => {
-      const presenteId = numero(active.id);
+      const presenteId = chave(active.id);
       const origem = categoriaDoPresente(l, presenteId);
-      const destino = tipo(over.id) === 'l' ? numero(over.id) : categoriaDoPresente(l, numero(over.id));
+      const destino = tipo(over.id) === 'l' ? numero(over.id) : categoriaDoPresente(l, chave(over.id));
       if (origem === undefined || destino === undefined || origem === destino) return l;
       const alvo = l.itens[destino];
-      const indice = tipo(over.id) === 'p' ? alvo.indexOf(numero(over.id)) : alvo.length;
+      const indice = tipo(over.id) === 'p' ? alvo.indexOf(chave(over.id)) : alvo.length;
       return {
         ...l,
         itens: {
@@ -135,12 +137,12 @@ export function OrganizarLista({
       novo = { ...novo, ordem: arrayMove(novo.ordem, novo.ordem.indexOf(numero(active.id)), novo.ordem.indexOf(numero(over.id))) };
     }
     if (over && tipo(active.id) === 'p' && tipo(over.id) === 'p' && active.id !== over.id) {
-      const categoria = categoriaDoPresente(novo, numero(active.id));
-      if (categoria !== undefined && novo.itens[categoria].includes(numero(over.id))) {
+      const categoria = categoriaDoPresente(novo, chave(active.id));
+      if (categoria !== undefined && novo.itens[categoria].includes(chave(over.id))) {
         const lista = novo.itens[categoria];
         novo = {
           ...novo,
-          itens: { ...novo.itens, [categoria]: arrayMove(lista, lista.indexOf(numero(active.id)), lista.indexOf(numero(over.id))) },
+          itens: { ...novo.itens, [categoria]: arrayMove(lista, lista.indexOf(chave(active.id)), lista.indexOf(chave(over.id))) },
         };
       }
     }
@@ -153,7 +155,7 @@ export function OrganizarLista({
     setLayout(antes.current);
   };
 
-  const presenteAtivo = ativo && tipo(ativo) === 'p' ? porId.get(numero(ativo)) : undefined;
+  const presenteAtivo = ativo && tipo(ativo) === 'p' ? porId.get(chave(ativo)) : undefined;
   const categoriaAtiva = ativo && tipo(ativo) === 'c' ? categoriaPorId.get(numero(ativo)) : undefined;
 
   return (

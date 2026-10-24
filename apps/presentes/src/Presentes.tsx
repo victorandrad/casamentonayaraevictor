@@ -14,8 +14,8 @@ type GridProps = {
   icon: IconName;
   titulo: string;
   gifts: Presente[];
-  noCarrinho: (id: number) => number;
-  recemAdicionado: number | null;
+  noCarrinho: (id: string) => number;
+  recemAdicionado: string | null;
   onAdicionar: (g: Presente) => void;
 };
 
@@ -85,7 +85,7 @@ export default function Presentes() {
   const [lista, setLista] = useState<ListaPresentes | null>(null);
   const [erro, setErro] = useState('');
   const [checkoutAberto, setCheckoutAberto] = useState(false);
-  const [recemAdicionado, setRecemAdicionado] = useState<number | null>(null);
+  const [recemAdicionado, setRecemAdicionado] = useState<string | null>(null);
   const [retorno] = useState(lerRetornoDoStripe);
   const [retornoAberto, setRetornoAberto] = useState(retorno?.tipo === 'sucesso');
   const [avisoCancelado, setAvisoCancelado] = useState(retorno?.tipo === 'cancelado');
@@ -95,7 +95,7 @@ export default function Presentes() {
   useEffect(() => {
     if (retorno) limparRetornoDaUrl();
     if (retorno?.tipo !== 'cancelado') return;
-    const timer = setTimeout(() => setAvisoCancelado(false), 7000);
+    const timer = setTimeout(() => setAvisoCancelado(false), 10000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -118,7 +118,7 @@ export default function Presentes() {
   useEffect(() => {
     // A checkout left unpaid (cancelled or abandoned) still reserves its gifts:
     // release it first so the list shows them as available again.
-    cancelarPagamentoPendente(retorno?.tipo === 'sucesso' ? retorno.sessionId : undefined).finally(carregarLista);
+    cancelarPagamentoPendente(retorno?.tipo === 'sucesso' ? retorno.pedido : undefined).finally(carregarLista);
 
     // Back button from Stripe restores this page from cache: same thing.
     const onPageShow = (e: PageTransitionEvent) => {
@@ -137,7 +137,7 @@ export default function Presentes() {
     setTimeout(() => setRecemAdicionado((id) => (id === presente.id ? null : id)), 1400);
   };
 
-  const noCarrinho = (id: number) => carrinho.itens.find((i) => i.id === id)?.quantidade ?? 0;
+  const noCarrinho = (id: string) => carrinho.itens.find((i) => i.id === id)?.quantidade ?? 0;
 
   return (
     <section id="presentes" className="nv-section">
@@ -192,10 +192,33 @@ export default function Presentes() {
           })}
       </div>
 
+      {/* Back from the payment page without paying: a small note pinned above the cart, pointing at it. */}
       {avisoCancelado && (
-        <div className="presentes-toast" role="status">
-          Pagamento cancelado. Seus presentes continuam no carrinho.
-          <button onClick={() => setAvisoCancelado(false)} aria-label="Fechar aviso">
+        <div
+          className={carrinho.quantidade > 0 && !checkoutAberto ? 'presentes-aviso presentes-aviso--carrinho' : 'presentes-aviso'}
+          role="status"
+        >
+          <span className="presentes-aviso__icone" aria-hidden>
+            <Icon name="heart" size={18} />
+          </span>
+          <span className="presentes-aviso__texto">
+            <strong>Pagamento não concluído</strong>
+            <span>
+              Nada foi cobrado.{carrinho.quantidade > 0 ? ' Seus presentes continuam guardados no carrinho.' : ''}
+            </span>
+            {carrinho.quantidade > 0 && (
+              <button
+                className="presentes-aviso__acao"
+                onClick={() => {
+                  setAvisoCancelado(false);
+                  setCheckoutAberto(true);
+                }}
+              >
+                Tentar de novo →
+              </button>
+            )}
+          </span>
+          <button className="presentes-aviso__fechar" onClick={() => setAvisoCancelado(false)} aria-label="Fechar aviso">
             ×
           </button>
         </div>
@@ -203,7 +226,7 @@ export default function Presentes() {
 
       {retorno?.tipo === 'sucesso' && retornoAberto && (
         <RetornoPagamento
-          sessionId={retorno.sessionId}
+          uid={retorno.pedido}
           onConcluido={() => carrinho.dispatch({ tipo: 'limpar' })}
           onFechar={() => setRetornoAberto(false)}
         />
@@ -235,6 +258,7 @@ export default function Presentes() {
           onQuantidade={(id, quantidade) => carrinho.dispatch({ tipo: 'quantidade', id, quantidade })}
           onRemover={(id) => carrinho.dispatch({ tipo: 'remover', id })}
           onFechar={() => setCheckoutAberto(false)}
+          gateway={lista?.gateway ?? 'stripe'}
         />
       )}
     </section>
