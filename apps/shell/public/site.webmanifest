@@ -1,6 +1,8 @@
 {
   "name": "Nayara & Victor · 28.08.2027",
   "short_name": "N & V",
+  "description": "Casamento de Nayara e Victor · 28 de agosto de 2027 · Itu, SP",
+  "lang": "pt-BR",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }

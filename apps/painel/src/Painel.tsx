@@ -29,6 +29,11 @@ export default function Painel() {
 
   useEffect(() => {
     document.title = 'Painel dos noivos · Nayara & Victor';
+    // The panel is private: keep it out of search results (robots.txt also disallows /painel).
+    const robots = document.createElement('meta');
+    robots.name = 'robots';
+    robots.content = 'noindex, nofollow';
+    document.head.append(robots);
     if (linkDeSenha()) return;
     api<{ usuario: Usuario }>('/auth/me')
       .then(({ usuario }) => setEstado({ fase: 'logado', usuario }))
@@ -36,7 +41,10 @@ export default function Painel() {
 
     const expirou = () => setEstado({ fase: 'anonimo', aviso: 'Sua sessão expirou. Entre novamente.' });
     window.addEventListener(SESSION_EXPIRED_EVENT, expirou);
-    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, expirou);
+    return () => {
+      window.removeEventListener(SESSION_EXPIRED_EVENT, expirou);
+      robots.remove();
+    };
   }, []);
 
   const sair = useCallback(async () => {
