@@ -45,7 +45,7 @@
 .album__pagina {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 44px 40px;
   padding: 44px 46px 50px;
   background:
@@ -73,19 +73,21 @@
   to { opacity: 1; transform: none; }
 }
 @media (max-width: 900px) {
-  .album__pagina { grid-template-columns: repeat(3, 1fr); gap: 34px 28px; padding: 34px 30px 40px; }
+  .album__pagina { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 34px 28px; padding: 34px 30px 40px; }
   .album__pagina::before { display: none; }
 }
 @media (max-width: 560px) {
   .album { padding: 10px; }
   .album::after { inset: 4px; }
-  .album__pagina { grid-template-columns: repeat(2, 1fr); gap: 26px 18px; padding: 24px 18px 30px; }
+  .album__pagina { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px 18px; padding: 24px 18px 30px; }
 }
 
 /* A photo: white print with a wider bottom margin for the handwritten caption, glued a bit crooked
    and held by four dark corner mounts. */
+/* min-width: 0 so a photo's natural size never widens its grid column (it overflowed phones) */
 .album-foto {
   position: relative;
+  min-width: 0;
   padding: 0;
   border: none;
   background: none;
@@ -111,8 +113,10 @@
   box-shadow: 0 1px 1px rgba(143, 84, 78, 0.18), 0 10px 18px -12px rgba(143, 84, 78, 0.45);
   transition: box-shadow 0.45s var(--nv-ease);
 }
-.album-foto__janela { position: relative; display: block; aspect-ratio: 1; overflow: hidden; background: var(--nv-blush-soft); }
+.album-foto__janela { position: relative; display: block; width: 100%; aspect-ratio: 1; overflow: hidden; background: var(--nv-blush-soft); }
 .album-foto__img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;

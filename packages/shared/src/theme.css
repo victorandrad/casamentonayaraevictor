@@ -25,13 +25,15 @@
   --nv-script: 'Pinyon Script', cursive;
 }
 
-/* The site has a single light design. Declaring it light-only (and answering the dark media query
-   with the same colours) keeps browsers with a forced dark mode — Samsung Internet, Chrome's
-   auto-dark — from repainting the cream and rose palette in dark tones. */
-:root { color-scheme: only light; }
+/* The site has a single light design, but it declares a dark theme too: browsers with a forced dark
+   mode (Samsung Internet, Chrome's auto-dark) only leave a page alone when it says it handles dark
+   itself — "light only" is ignored by Samsung Internet. Its "dark theme" is simply the same light
+   palette, with the browser's own controls kept light where a component doesn't style them. */
+:root { color-scheme: light dark; }
 @media (prefers-color-scheme: dark) {
-  :root { color-scheme: only light; }
   html, body { background-color: var(--nv-cream); color: var(--nv-ink); }
+  input, textarea, select { background-color: #fff; color: var(--nv-ink); }
+  ::placeholder { color: var(--nv-muted); }
 }
 
 * { box-sizing: border-box; }
