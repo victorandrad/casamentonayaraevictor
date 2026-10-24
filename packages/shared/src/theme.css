@@ -1,5 +1,5 @@
 /* Design tokens and shared classes for every microfrontend. */
-@import url('https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Jost:wght@300;400;500&family=Pinyon+Script&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Jost:wght@300;400;500&family=Pinyon+Script&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&display=swap');
 
 :root {
   --nv-cream: #f6f1ea;

@@ -388,3 +388,6 @@
   margin: 0 0 22px;
 }
 .shell-footer__note { font-family: var(--nv-serif); font-style: italic; font-size: 15px; color: var(--nv-rose-deep); margin: 0; }
+
+.shell-footer__mapa { margin-top: 14px; background: none; border: 0; padding: 4px; font: italic 400 13px 'IM Fell English', Georgia, serif; color: var(--nv-taupe); cursor: pointer; letter-spacing: 0.04em; }
+.shell-footer__mapa:hover { color: var(--nv-rose-deep); }

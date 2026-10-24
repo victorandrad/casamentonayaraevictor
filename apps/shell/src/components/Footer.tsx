@@ -1,6 +1,6 @@
 import { Branch, casamento } from '@nv/shared';
 
-export function Footer() {
+export function Footer({ onReverMapa }: { onReverMapa: () => void }) {
   return (
     <footer className="shell-footer">
       <div className="shell-footer__monogram">
@@ -17,6 +17,9 @@ export function Footer() {
         {casamento.dataExtenso} · {casamento.cidade}
       </p>
       <p className="shell-footer__note">Feito com amor para celebrar o nosso dia.</p>
+      <button className="shell-footer__mapa" onClick={onReverMapa}>
+        ✦ Rever o mapa
+      </button>
     </footer>
   );
 }
