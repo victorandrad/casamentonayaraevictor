@@ -33,11 +33,14 @@ export const config = {
   stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET ?? '',
   // Uploaded gift photos (a Docker volume in production)
   uploadsDir: env.UPLOADS_DIR ?? join(import.meta.dirname, '..', 'uploads'),
-  // Mail server config folder shared with docker-mailserver (mailboxes managed in the panel).
+  // Config folder of the mail server (docker-mailserver, in its own Docker project, serving several
+  // domains). The panel manages only MAIL_DOMAIN's mailboxes there.
   // Empty = the E-mails tab shows that the mail server is not set up here.
   mail: {
     configDir: env.MAIL_CONFIG_DIR ?? '',
     domain: (env.MAIL_DOMAIN ?? '').trim().toLowerCase(),
+    // Server name for IMAP/SMTP (shared by every domain); default mail.<domain>.
+    hostname: (env.MAIL_HOSTNAME || (env.MAIL_DOMAIN ? `mail.${env.MAIL_DOMAIN.trim().toLowerCase()}` : '')).trim().toLowerCase(),
     webmailUrl: env.WEBMAIL_URL ?? '',
     // The mailbox with the panel login's address uses the panel password (synced by the seed).
     adminEmail: (env.ADMIN_EMAIL ?? '').trim().toLowerCase(),

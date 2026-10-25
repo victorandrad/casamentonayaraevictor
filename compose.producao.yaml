@@ -26,13 +26,23 @@ services:
       ALLOWED_ORIGINS: https://${DOMINIO:?defina DOMINIO no .env}
       SITE_URL: https://${DOMINIO}
       COOKIE_SECURE: "true"
-      # Caixas de e-mail cadastradas no painel (volume compartilhado com o mailserver)
+      # Caixas e apelidos @DOMINIO cadastrados no painel, no servidor de e-mail do outro projeto
+      # (a pasta de configuração dele é montada em /mail-config; veja volumes abaixo).
       MAIL_DOMAIN: ${DOMINIO}
       MAIL_CONFIG_DIR: /mail-config
-      # Recibos saem pelo servidor de e-mail do projeto, sem login (rede do projeto).
-      SMTP_HOST: mail.${DOMINIO}
+      MAIL_HOSTNAME: ${MAIL_HOSTNAME:-mail.${DOMINIO}}
+      WEBMAIL_URL: ${WEBMAIL_URL:-}
+      # Recibos saem pelo servidor de e-mail compartilhado, sem login, pela rede dele. O nome tem que
+      # bater com o certificado do servidor (o STARTTLS confere).
+      SMTP_HOST: ${MAIL_HOSTNAME:-mail.${DOMINIO}}
       SMTP_PORT: 25
       SMTP_SECURE: "false"
+    volumes: !override
+      - uploads-data:/app/uploads
+      - ${MAIL_CONFIG_PATH:?defina MAIL_CONFIG_PATH no .env (pasta config do servidor de e-mail)}:/mail-config
+    networks:
+      - default
+      - email
     # raw: cada valor é usado como está (senhas com $, aspas ou espaços não quebram).
     env_file:
       - path: segredos.env
@@ -60,49 +70,12 @@ services:
       traefik.http.middlewares.casamento-www.redirectregex.permanent: "true"
       traefik.http.services.casamento.loadbalancer.server.port: "80"
 
-  # Só para desenvolvimento: em produção os e-mails saem pelo mailserver abaixo.
+  # Só para desenvolvimento: em produção os e-mails saem pelo servidor de e-mail compartilhado.
   mailpit:
     profiles: ["dev"]
 
-  # Servidor de e-mail do domínio (envio e recebimento). Certificado: o mesmo que o Traefik emite
-  # para mail.<domínio> (rota do webmail), lido do acme.json dele. Portas abertas no servidor:
-  # 25 (receber de outros servidores), 465/587 (enviar com login) e 993 (IMAP).
-  mailserver:
-    profiles: !reset []
-    hostname: mail.${DOMINIO}
-    environment:
-      SSL_TYPE: letsencrypt
-      SSL_DOMAIN: mail.${DOMINIO}
-    # Só IPv4: assim o servidor vê o IP real de quem conecta (no IPv6 o Docker passaria o IP da
-    # própria rede, que tem permissão de enviar sem login).
-    ports: !override
-      - "0.0.0.0:25:25"
-      - "0.0.0.0:465:465"
-      - "0.0.0.0:587:587"
-      - "0.0.0.0:993:993"
-    volumes:
-      # Só o arquivo (só leitura): o mailserver extrai o certificado para /etc/letsencrypt/live.
-      - /var/lib/docker/volumes/traefik-duis_traefik-letsencrypt/_data/acme.json:/etc/letsencrypt/acme.json:ro
-    networks:
-      default:
-        # Dentro da rede do projeto o nome público aponta para cá: API e webmail falam com o
-        # mailserver direto, e o certificado continua batendo com o nome.
-        aliases:
-          - mail.${DOMINIO}
-
-  # Webmail em https://mail.<domínio>
-  webmail:
-    profiles: !reset []
-    environment:
-      ROUNDCUBEMAIL_DEFAULT_HOST: ssl://mail.${DOMINIO}
-      ROUNDCUBEMAIL_DEFAULT_PORT: 993
-      ROUNDCUBEMAIL_SMTP_SERVER: tls://mail.${DOMINIO}
-      ROUNDCUBEMAIL_SMTP_PORT: 587
-    ports: !reset []
-    labels:
-      traefik.enable: "true"
-      traefik.docker.network: casamento-nv_default
-      traefik.http.routers.casamento-mail.rule: Host(`mail.${DOMINIO}`)
-      traefik.http.routers.casamento-mail.entrypoints: websecure
-      traefik.http.routers.casamento-mail.tls.certresolver: letsencrypt
-      traefik.http.services.casamento-mail.loadbalancer.server.port: "80"
+networks:
+  # Rede do projeto do servidor de e-mail (criada por ele): a API envia por ela, sem login.
+  email:
+    external: true
+    name: ${EMAIL_REDE:-email}

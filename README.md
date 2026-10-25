@@ -242,31 +242,32 @@ Use a chave **live** e crie no Dashboard um webhook para `https://casamentonayar
 Quando um presente é pago, o convidado recebe um **recibo** no visual do site (itens, total, forma de pagamento, número do pedido e a mensagem dele). O envio acontece uma única vez por pedido, e a aba **Recebidos** mostra o status e tem **Reenviar recibo**. Convites e recuperação de senha do painel também saem por e-mail.
 
 - **Desenvolvimento:** o **Mailpit** recebe tudo em http://localhost:8025. Nada sai da sua máquina.
-- **Produção:** servidor de e-mail próprio do domínio, que **envia e recebe**. Remetente: `Nayara & Victor <nao-responder@casamentonayaraevictor.com.br>`.
+- **Produção:** servidor de e-mail próprio, que **envia e recebe**. Ele roda em **outro projeto Docker** no mesmo VPS porque atende vários domínios. Remetente: `Nayara & Victor <nao-responder@casamentonayaraevictor.com.br>`.
 
 <details>
-<summary><b>Servidor de e-mail em produção (@casamentonayaraevictor.com.br)</b></summary>
+<summary><b>Servidor de e-mail compartilhado (@casamentonayaraevictor.com.br)</b></summary>
 
-- **mailserver** ([docker-mailserver](https://docker-mailserver.github.io/docker-mailserver/latest/) 16: Postfix, Dovecot e Rspamd com DKIM). Portas 25 (receber), 465/587 (enviar com login) e 993 (IMAP). Certificado emitido pelo Traefik para `mail.casamentonayaraevictor.com.br`.
-- **Webmail** (Roundcube) em **https://mail.casamentonayaraevictor.com.br**.
-- **Caixas e apelidos pelo painel**, aba **E-mails**: criar e excluir caixas, trocar senha, criar apelidos (ex.: `noivos@` entregando em `contato@` ou num Gmail). A caixa do `ADMIN_EMAIL` usa a mesma senha do login do painel.
-- **fail2ban** ignora a rede interna do projeto (os logins do webmail vêm do container do Roundcube); as portas 993/587/465 continuam protegidas.
-- Recibos e convites saem pela porta 25 interna, sem login. O `nao-responder@` não tem caixa.
+O servidor ([docker-mailserver](https://docker-mailserver.github.io/docker-mailserver/latest/), com webmail) é de outro projeto e serve vários domínios. Este site só faz duas coisas com ele:
 
-**DNS (Registro.br):**
+- **Gerencia as caixas e apelidos deste domínio** pela aba **E-mails** do painel. A API edita `postfix-accounts.cf` e `postfix-virtual.cf` na pasta de configuração do servidor, montada em `/mail-config`. Ela só vê e altera linhas `@casamentonayaraevictor.com.br`: as linhas e os comentários dos outros domínios ficam como estão. A caixa do `ADMIN_EMAIL` usa a mesma senha do login do painel.
+- **Envia recibos, convites e recuperação de senha** pela porta 25, sem login, entrando na rede Docker do projeto de e-mail.
 
-| Registro | Nome | Valor |
-| --- | --- | --- |
-| A | `mail` | `177.7.36.12` |
-| MX | (domínio) | `mail.casamentonayaraevictor.com.br` (prioridade 10) |
-| TXT (SPF) | (domínio) | `v=spf1 mx -all` |
-| TXT (DKIM) | `mail._domainkey` | `docker compose -f compose.yaml -f compose.producao.yaml exec mailserver setup config dkim domain casamentonayaraevictor.com.br` |
-| TXT (DMARC) | `_dmarc` | `v=DMARC1; p=quarantine; adkim=s; aspf=s` |
-| PTR | `177.7.36.12` | `mail.casamentonayaraevictor.com.br` (hPanel → VPS → DNS reverso) |
+**No `/opt/casamento/.env` do servidor** (veja [docker/.env.producao.example](docker/.env.producao.example)):
 
-**No celular, Outlook ou Thunderbird:** conta IMAP, usuário = endereço completo, servidor `mail.casamentonayaraevictor.com.br`, entrada na porta 993 (SSL/TLS) e saída na 587 (STARTTLS).
+| Variável | Para quê |
+| --- | --- |
+| `MAIL_CONFIG_PATH` | pasta `config` do docker-mailserver. O uid 1000 (usuário da API) precisa ter permissão de escrita |
+| `EMAIL_REDE` | rede Docker do projeto de e-mail (padrão `email`), que precisa existir antes do deploy |
+| `MAIL_HOSTNAME` | nome do servidor, o mesmo do certificado (padrão `mail.casamentonayaraevictor.com.br`). Precisa ser alias do container nessa rede, porque o STARTTLS confere o nome |
+| `WEBMAIL_URL` | link do webmail no painel (padrão `https://MAIL_HOSTNAME`) |
 
-**Localmente:** `docker compose --profile email up -d mailserver webmail` (webmail em http://localhost:8089, domínio `casamento.localhost`).
+**No projeto de e-mail:** coloque a rede da API em `PERMIT_DOCKER` (ou `connected-networks`) para ela poder enviar sem login. Configure também o DKIM de `casamentonayaraevictor.com.br`.
+
+**DNS do domínio (Registro.br):** `MX` → `MAIL_HOSTNAME`, SPF `v=spf1 mx -all`, a chave DKIM gerada no projeto de e-mail e DMARC `v=DMARC1; p=quarantine; adkim=s; aspf=s`.
+
+**No celular, Outlook ou Thunderbird:** conta IMAP com o endereço completo como usuário e servidor `MAIL_HOSTNAME`. Entrada na porta 993 (SSL/TLS) e saída na 587 (STARTTLS).
+
+**Localmente** não há servidor de e-mail. A aba E-mails grava num volume vazio e os envios caem no Mailpit.
 
 </details>
 
@@ -316,7 +317,7 @@ Em *Settings → Secrets and variables → Actions*. A cada deploy o job manda o
 | Tipo | Nome | Para quê |
 | --- | --- | --- |
 | Secret | `VPS_SSH_KEY` | chave do deploy (presa ao `casamento-deploy`) |
-| Secret | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | dono do painel e a caixa de e-mail com esse endereço |
+| Secret | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | dono do painel e a caixa de e-mail com esse endereço (no servidor compartilhado) |
 | Secret | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe em modo real |
 | Variable | `ADMIN_NOME`, `EMAIL_FROM`, `EMAIL_REPLY_TO` | nome no painel e remetente dos e-mails |
 

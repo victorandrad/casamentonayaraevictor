@@ -10,7 +10,7 @@
 #
 # Secrets:   VPS_SSH_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
 # Variables: ADMIN_NOME, EMAIL_FROM, EMAIL_REPLY_TO
-# (Os recibos saem pelo servidor de e-mail do próprio projeto: não há SMTP para configurar.)
+# (Os recibos saem pelo servidor de e-mail compartilhado, configurado no .env do servidor: não há SMTP aqui.)
 # Os vazios ficam de fora (a API usa o padrão dela).
 name: Deploy no VPS
 

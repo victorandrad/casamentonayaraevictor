@@ -4,7 +4,9 @@
 #
 #   backend  <commit>  → api  (ghcr.io/victorandrad/casamento-api:<commit>)   workflow "Backend"
 #   frontend <commit>  → web  (ghcr.io/victorandrad/casamento-web:<commit>)   workflow "Frontend"
-#   tudo     [commit]  → api + web (+ db, mailserver, webmail)                 à mão
+#   tudo     [commit]  → api + web (+ db)                                       à mão
+#
+# O servidor de e-mail fica em outro projeto Docker (atende vários domínios): veja o README.
 #
 # O VPS não guarda o código (nada de git clone): /opt/casamento tem só .env, compose.yaml e
 # compose.producao.yaml (+ segredos.env, gravado aqui). Pela entrada padrão o workflow manda três linhas:

@@ -1,6 +1,8 @@
-// Mailboxes and aliases of the couple's own mail server (docker-mailserver), managed in the panel.
-// The server reads two files from its config folder (shared with the API as a volume) and reloads
-// them by itself a few seconds after they change:
+// Mailboxes and aliases of this domain on the couple's mail server (docker-mailserver), managed in
+// the panel. The server lives in another Docker project and serves several domains: the API sees
+// and changes only the lines of this domain and keeps the others exactly as they are. The server
+// reads two files from its config folder (mounted in the API) and reloads them by itself a few
+// seconds after they change:
 //   postfix-accounts.cf  →  endereco|{SHA512-CRYPT}$6$...     (one mailbox per line)
 //   postfix-virtual.cf   →  apelido destino1,destino2         (aliases / forwards)
 import { access, constants, readFile, rename, writeFile } from 'node:fs/promises';
@@ -24,6 +26,7 @@ const EMAIL = /^[^\s@,|]+@[^\s@,|]+\.[^\s@,|]+$/;
 export const SENHA_MINIMA = 10;
 
 const { configDir, domain } = config.mail;
+const doDominio = (endereco: string) => Boolean(domain) && endereco.endsWith(`@${domain}`);
 
 async function disponivel(): Promise<boolean> {
   if (!configDir || !domain) return false;
@@ -39,20 +42,25 @@ async function exigirDisponivel() {
   if (!(await disponivel())) throw new ErroEmail('O servidor de e-mail não está configurado neste ambiente.', 503);
 }
 
-async function lerLinhas(arquivo: string): Promise<string[]> {
+async function lerArquivo(arquivo: string): Promise<string[]> {
   try {
-    return (await readFile(join(configDir, arquivo), 'utf8')).split('\n').filter((l) => l.trim() && !l.startsWith('#'));
+    return (await readFile(join(configDir, arquivo), 'utf8')).split('\n');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
     throw error;
   }
 }
 
-// Atomic write (temp file + rename) so the mail server never reads half a file.
+const lerLinhas = async (arquivo: string) => (await lerArquivo(arquivo)).filter((l) => l.trim() && !l.startsWith('#'));
+
+// Atomic write (temp file + rename) so the mail server never reads half a file. Comments already in
+// the file (the file is shared with the other domains) stay at the top.
 async function gravarLinhas(arquivo: string, linhas: string[]) {
   const destino = join(configDir, arquivo);
   const temp = `${destino}.${process.pid}.tmp`;
-  await writeFile(temp, linhas.length ? `${linhas.join('\n')}\n` : '', { mode: 0o600 });
+  const comentarios = (await lerArquivo(arquivo)).filter((l) => l.startsWith('#'));
+  const todas = [...comentarios, ...linhas];
+  await writeFile(temp, todas.length ? `${todas.join('\n')}\n` : '', { mode: 0o600 });
   await rename(temp, destino);
 }
 
@@ -70,11 +78,13 @@ const lerContas = async () =>
     return { endereco: endereco.trim().toLowerCase(), linha: l, hash };
   });
 
-const lerApelidos = async (): Promise<ApelidoEmail[]> =>
+// `linha` keeps the original text: lines of other domains are written back untouched.
+const lerApelidos = async (): Promise<(ApelidoEmail & { linha: string })[]> =>
   (await lerLinhas(APELIDOS)).map((l) => {
     const [endereco, destinos = ''] = l.trim().split(/\s+/, 2);
-    return { endereco: endereco.toLowerCase(), destinos: destinos.split(',').map((d) => d.trim()).filter(Boolean) };
+    return { endereco: endereco.toLowerCase(), destinos: destinos.split(',').map((d) => d.trim()).filter(Boolean), linha: l };
   });
+const linhaDoApelido = (a: ApelidoEmail) => `${a.endereco} ${a.destinos.join(',')}`;
 
 // "contato" or "contato@dominio" → "contato@dominio" (only this domain).
 function enderecoDoDominio(usuario: string): string {
@@ -119,17 +129,23 @@ function protegerCaixaDoPainel(endereco: string) {
 
 export async function listar(): Promise<EmailsAdmin> {
   const pronto = await disponivel();
-  const caixas: CaixaEmail[] = pronto ? (await lerContas()).map(({ endereco }) => ({ endereco })) : [];
+  const caixas: CaixaEmail[] = pronto
+    ? (await lerContas()).filter((c) => doDominio(c.endereco)).map(({ endereco }) => ({ endereco }))
+    : [];
+  const apelidos: ApelidoEmail[] = pronto
+    ? (await lerApelidos()).filter((a) => doDominio(a.endereco)).map(({ endereco, destinos }) => ({ endereco, destinos }))
+    : [];
+  const { hostname } = config.mail;
   return {
     disponivel: pronto,
     dominio: domain,
     caixas: caixas.sort((a, b) => a.endereco.localeCompare(b.endereco)),
-    apelidos: pronto ? (await lerApelidos()).sort((a, b) => a.endereco.localeCompare(b.endereco)) : [],
+    apelidos: apelidos.sort((a, b) => a.endereco.localeCompare(b.endereco)),
     caixaDoPainel: caixaDoPainel(),
     servidor: {
-      imap: domain ? `mail.${domain}` : '',
-      smtp: domain ? `mail.${domain}` : '',
-      webmail: config.mail.webmailUrl || (domain ? `https://mail.${domain}` : ''),
+      imap: hostname,
+      smtp: hostname,
+      webmail: config.mail.webmailUrl || (hostname ? `https://${hostname}` : ''),
     },
   };
 }
@@ -155,7 +171,7 @@ export function trocarSenha(endereco: string, senha: string): Promise<void> {
     validarSenha(senha);
     const contas = await lerContas();
     const alvo = endereco.trim().toLowerCase();
-    if (!contas.some((c) => c.endereco === alvo)) throw new ErroEmail('Caixa não encontrada.', 404);
+    if (!doDominio(alvo) || !contas.some((c) => c.endereco === alvo)) throw new ErroEmail('Caixa não encontrada.', 404);
     protegerCaixaDoPainel(alvo);
     await gravarLinhas(
       CONTAS,
@@ -170,7 +186,7 @@ export function excluirCaixa(endereco: string): Promise<void> {
     await exigirDisponivel();
     const contas = await lerContas();
     const alvo = endereco.trim().toLowerCase();
-    if (!contas.some((c) => c.endereco === alvo)) throw new ErroEmail('Caixa não encontrada.', 404);
+    if (!doDominio(alvo) || !contas.some((c) => c.endereco === alvo)) throw new ErroEmail('Caixa não encontrada.', 404);
     protegerCaixaDoPainel(alvo);
     await gravarLinhas(CONTAS, contas.filter((c) => c.endereco !== alvo).map((c) => c.linha));
   });
@@ -189,10 +205,11 @@ export function salvarApelido(usuario: string, destinos: string[], novo: boolean
     if (novo && (await lerContas()).some((c) => c.endereco === endereco)) {
       throw new ErroEmail('Esse endereço já é uma caixa de e-mail.', 409);
     }
-    const lista = existe
-      ? apelidos.map((a) => (a.endereco === endereco ? { endereco, destinos: limpos } : a))
-      : [...apelidos, { endereco, destinos: limpos }];
-    await gravarLinhas(APELIDOS, lista.map((a) => `${a.endereco} ${a.destinos.join(',')}`));
+    const linha = linhaDoApelido({ endereco, destinos: limpos });
+    const linhas = existe
+      ? apelidos.map((a) => (a.endereco === endereco ? linha : a.linha))
+      : [...apelidos.map((a) => a.linha), linha];
+    await gravarLinhas(APELIDOS, linhas);
     return { endereco, destinos: limpos };
   });
 }
@@ -202,11 +219,8 @@ export function excluirApelido(endereco: string): Promise<void> {
     await exigirDisponivel();
     const apelidos = await lerApelidos();
     const alvo = endereco.trim().toLowerCase();
-    if (!apelidos.some((a) => a.endereco === alvo)) throw new ErroEmail('Apelido não encontrado.', 404);
-    await gravarLinhas(
-      APELIDOS,
-      apelidos.filter((a) => a.endereco !== alvo).map((a) => `${a.endereco} ${a.destinos.join(',')}`),
-    );
+    if (!doDominio(alvo) || !apelidos.some((a) => a.endereco === alvo)) throw new ErroEmail('Apelido não encontrado.', 404);
+    await gravarLinhas(APELIDOS, apelidos.filter((a) => a.endereco !== alvo).map((a) => a.linha));
   });
 }
 
@@ -231,6 +245,7 @@ export function atualizarSenhaDaCaixa(endereco: string, senha: string): Promise<
   return emOrdem(async () => {
     if (!(await disponivel())) return false;
     const alvo = endereco.trim().toLowerCase();
+    if (!doDominio(alvo)) return false;
     const contas = await lerContas();
     if (!contas.some((c) => c.endereco === alvo)) return false;
     await gravarLinhas(CONTAS, contas.map((c) => (c.endereco === alvo ? `${alvo}|${hashDaSenha(senha)}` : c.linha)));

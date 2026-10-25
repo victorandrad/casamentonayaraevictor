@@ -1,6 +1,9 @@
 # Site do casamento em containers.
 #
 #   docker compose up -d --build                  → banco, API e Mailpit (os front-ends rodam no npm run dev)
+#
+# O servidor de e-mail de produção é outro projeto Docker (atende vários domínios); a API só edita
+# as caixas deste domínio na pasta de configuração dele.
 #   docker compose --profile site up -d --build   → + o site completo no Nginx: http://localhost:8088
 #   docker compose --profile stripe up -d         → + Stripe CLI repassando os webhooks de teste
 #
@@ -50,14 +53,17 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       EMAIL_FROM: ${EMAIL_FROM:-Nayara & Victor <nao-responder@nayaraevictor.local>}
       EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-}
-      # Mailboxes managed from the panel (shared with the mailserver service)
+      # Mailboxes of this domain managed from the panel. The mail server itself lives in another
+      # Docker project (it serves several domains); the API only edits its config folder.
       MAIL_DOMAIN: ${MAIL_DOMAIN:-casamento.localhost}
       MAIL_CONFIG_DIR: /mail-config
     ports:
       - "${API_PORT:-4100}:4100"
     volumes:
       - uploads-data:/app/uploads
-      - mail-config:/mail-config
+      # Config folder of the mail server (postfix-accounts.cf / postfix-virtual.cf). Locally an
+      # empty volume; on the server, the folder of the mail server's project (MAIL_CONFIG_PATH).
+      - ${MAIL_CONFIG_PATH:-mail-config}:/mail-config
     depends_on:
       db:
         condition: service_healthy
@@ -96,66 +102,6 @@ services:
     volumes:
       - mail-data:/data
 
-  # Own mail server (Postfix + Dovecot + Rspamd/DKIM). Mailboxes and aliases are managed in the
-  # couple's panel (E-mails tab): the API writes postfix-accounts.cf / postfix-virtual.cf in the
-  # shared mail-config volume and the server reloads them by itself. Off locally unless asked:
-  #   docker compose --profile email up -d mailserver webmail
-  mailserver:
-    image: ghcr.io/docker-mailserver/docker-mailserver:16.0.1
-    profiles: ["email"]
-    hostname: ${MAIL_HOSTNAME:-mail.casamento.localhost}
-    restart: unless-stopped
-    environment:
-      ENABLE_RSPAMD: 1
-      ENABLE_OPENDKIM: 0
-      ENABLE_OPENDMARC: 0
-      ENABLE_POLICYD_SPF: 0
-      ENABLE_AMAVIS: 0
-      ENABLE_CLAMAV: 0
-      ENABLE_FAIL2BAN: 1
-      # Containers of this project (the API) may send without logging in.
-      PERMIT_DOCKER: connected-networks
-      SSL_TYPE: ${MAIL_SSL_TYPE:-}
-      TZ: America/Sao_Paulo
-    ports:
-      - "${MAIL_SMTP_PORT:-2525}:25"
-      - "${MAIL_SUBMISSION_PORT:-2587}:587"
-      - "${MAIL_SUBMISSIONS_PORT:-2465}:465"
-      - "${MAIL_IMAPS_PORT:-2993}:993"
-    volumes:
-      - mail-config:/tmp/docker-mailserver
-      - mail-server-data:/var/mail
-      - mail-server-state:/var/mail-state
-      - mail-server-logs:/var/log/mail
-    cap_add:
-      - NET_ADMIN
-    healthcheck:
-      test: "ss --listening --tcp | grep -P 'LISTEN.+:smtp' || exit 1"
-      interval: 15s
-      timeout: 3s
-      retries: 0
-
-  # Webmail (Roundcube) for reading and answering the mailboxes in the browser.
-  webmail:
-    image: roundcube/roundcubemail:1.7.5-apache
-    profiles: ["email"]
-    restart: unless-stopped
-    environment:
-      ROUNDCUBEMAIL_DEFAULT_HOST: ${MAIL_IMAP_HOST:-mailserver}
-      ROUNDCUBEMAIL_DEFAULT_PORT: ${MAIL_IMAP_PORT:-143}
-      ROUNDCUBEMAIL_SMTP_SERVER: ${MAIL_SMTP_HOST:-mailserver}
-      ROUNDCUBEMAIL_SMTP_PORT: ${MAIL_WEBMAIL_SMTP_PORT:-25}
-      ROUNDCUBEMAIL_DB_TYPE: sqlite
-      ROUNDCUBEMAIL_SKIN: elastic
-      ROUNDCUBEMAIL_UPLOAD_MAX_FILESIZE: 20M
-      ROUNDCUBEMAIL_PLUGINS: archive,zipdownload,managesieve,markasjunk
-    ports:
-      - "${WEBMAIL_PORT:-8089}:80"
-    volumes:
-      - webmail-data:/var/roundcube/db
-    depends_on:
-      - mailserver
-
   # Local only: forwards Stripe test events to the API.
   #   docker compose --profile stripe up -d stripe-cli
   #   docker compose logs stripe-cli   → copy the whsec_… into STRIPE_WEBHOOK_SECRET
@@ -177,7 +123,3 @@ volumes:
   uploads-data:
   mail-data:
   mail-config:
-  mail-server-data:
-  mail-server-state:
-  mail-server-logs:
-  webmail-data:
