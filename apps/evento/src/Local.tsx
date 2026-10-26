@@ -9,7 +9,7 @@ export default function Local() {
       <div className="nv-container">
         <SectionHeader eyebrow="Como chegar" title="Local" />
         <div className="local-grid">
-          {consentimento === 'todos' ? (
+          {consentimento?.mapa ? (
             <iframe
               title="Recanto Espelho da Lua no mapa"
               src={locais.recepcao.embed}
@@ -20,7 +20,7 @@ export default function Local() {
           ) : (
             <div className="local-map local-map--bloqueado">
               <p>O mapa é carregado do Google, que pode usar cookies próprios.</p>
-              <button className="nv-btn-outline" onClick={() => salvarConsentimento('todos')}>
+              <button className="nv-btn-outline" onClick={() => salvarConsentimento({ ...consentimento, mapa: true })}>
                 Permitir e mostrar o mapa
               </button>
             </div>

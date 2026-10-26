@@ -1,27 +1,43 @@
 import { useEffect, useState } from 'react';
 
 // Cookie consent. The site itself only keeps essential data in the browser (cart, pending payment,
-// the map opening, the panel login); the one optional item is the Google Maps embed, which sets
-// Google's own cookies. The choice lives in localStorage and is broadcast with a window event so
-// every micro-frontend (shell banner, evento map) sees it at once.
-export type Consentimento = 'todos' | 'essenciais';
+// the map opening, the panel login), which needs no consent. Each optional category is a flag the
+// guest turns on or off; today the only one is the Google Maps embed, which sets Google's own cookies.
+// The choice lives in localStorage and is broadcast with a window event so every micro-frontend
+// (shell notice, evento map) sees it at once.
+export type Consentimento = { mapa: boolean };
+
+export const CONSENTIMENTO_TOTAL: Consentimento = { mapa: true };
+export const SO_ESSENCIAIS: Consentimento = { mapa: false };
 
 const CHAVE = 'nv_cookies';
 const MUDOU = 'nv:consentimento';
 const PREFERENCIAS = 'nv:consentimento-preferencias';
 
 export function lerConsentimento(): Consentimento | null {
+  let valor: string | null;
   try {
-    const valor = localStorage.getItem(CHAVE);
-    return valor === 'todos' || valor === 'essenciais' ? valor : null;
+    valor = localStorage.getItem(CHAVE);
   } catch {
     return null;
   }
+  // First version stored a single word for all-or-nothing.
+  if (valor === 'todos') return CONSENTIMENTO_TOTAL;
+  if (valor === 'essenciais') return SO_ESSENCIAIS;
+  try {
+    const salvo: unknown = JSON.parse(valor ?? '');
+    if (salvo && typeof salvo === 'object' && typeof (salvo as Consentimento).mapa === 'boolean') {
+      return { mapa: (salvo as Consentimento).mapa };
+    }
+  } catch {
+    // nothing saved, or something unreadable: ask again
+  }
+  return null;
 }
 
 export function salvarConsentimento(valor: Consentimento) {
   try {
-    localStorage.setItem(CHAVE, valor);
+    localStorage.setItem(CHAVE, JSON.stringify(valor));
   } catch {
     // storage blocked: the choice lasts until the page is reloaded
   }

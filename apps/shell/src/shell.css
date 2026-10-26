@@ -413,9 +413,41 @@
 }
 .shell-cookies__titulo { margin: 0 0 6px; font-family: var(--nv-serif); font-size: 18px; color: var(--nv-ink); }
 .shell-cookies__texto { margin: 0; font-size: 13.5px; line-height: 1.6; }
-.shell-cookies__lista { margin: 12px 0 0; padding-left: 18px; font-size: 12.5px; line-height: 1.6; }
-.shell-cookies__lista li + li { margin-top: 6px; }
-.shell-cookies__lista strong { font-weight: 500; color: var(--nv-ink); }
+.shell-cookies__categorias { list-style: none; margin: 4px 0 0; padding: 0; }
+.shell-cookies__categoria { display: flex; align-items: flex-start; gap: 16px; padding: 12px 0; }
+.shell-cookies__categoria + .shell-cookies__categoria { border-top: 1px solid var(--nv-border); }
+.shell-cookies__categoria > div { flex: 1; }
+.shell-cookies__nome { display: block; font-size: 14px; font-weight: 500; color: var(--nv-ink); cursor: pointer; }
+.shell-cookies__nome small { margin-left: 6px; font-size: 10px; font-weight: 400; letter-spacing: 1.5px; text-transform: uppercase; color: var(--nv-taupe); }
+.shell-cookies__descricao { margin: 4px 0 0; font-size: 12.5px; line-height: 1.6; }
+.shell-cookies__interruptor {
+  flex: none;
+  position: relative;
+  width: 40px;
+  height: 22px;
+  margin: 2px 0 0;
+  appearance: none;
+  border-radius: 999px;
+  background: var(--nv-border-strong);
+  cursor: pointer;
+  transition: background 0.25s var(--nv-ease);
+}
+.shell-cookies__interruptor::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(67, 56, 47, 0.25);
+  transition: transform 0.25s var(--nv-ease);
+}
+.shell-cookies__interruptor:checked { background: var(--nv-rose); }
+.shell-cookies__interruptor:checked::after { transform: translateX(18px); }
+.shell-cookies__interruptor:disabled { cursor: default; opacity: 0.55; }
+.shell-cookies__interruptor:focus-visible { outline: 2px solid var(--nv-rose-deep); outline-offset: 2px; }
 .shell-cookies__acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 16px; }
 .shell-cookies__acoes .nv-btn,
 .shell-cookies__acoes .nv-btn-ghost { padding: 10px 18px; }
