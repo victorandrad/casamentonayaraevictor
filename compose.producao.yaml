@@ -26,20 +26,13 @@ services:
       ALLOWED_ORIGINS: https://${DOMINIO:?defina DOMINIO no .env}
       SITE_URL: https://${DOMINIO}
       COOKIE_SECURE: "true"
-      # Caixas e apelidos @DOMINIO cadastrados no painel, no servidor de e-mail do outro projeto
-      # (a pasta de configuração dele é montada em /mail-config; veja volumes abaixo).
-      MAIL_DOMAIN: ${DOMINIO}
-      MAIL_CONFIG_DIR: /mail-config
-      MAIL_HOSTNAME: ${MAIL_HOSTNAME:-mail.${DOMINIO}}
-      WEBMAIL_URL: ${WEBMAIL_URL:-}
-      # Recibos saem pelo servidor de e-mail compartilhado, sem login, pela rede dele. O nome tem que
-      # bater com o certificado do servidor (o STARTTLS confere).
+      # E-mails (recibos, convites, senha) saem pelo servidor de e-mail compartilhado, que só envia:
+      # sem login, pela rede interna dele (sem TLS: nada sai da rede Docker até ele).
       SMTP_HOST: ${MAIL_HOSTNAME:-mail.${DOMINIO}}
       SMTP_PORT: 25
       SMTP_SECURE: "false"
     volumes: !override
       - uploads-data:/app/uploads
-      - ${MAIL_CONFIG_PATH:?defina MAIL_CONFIG_PATH no .env (pasta config do servidor de e-mail)}:/mail-config
     networks:
       - default
       - email

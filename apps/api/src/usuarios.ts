@@ -6,7 +6,6 @@ import { createSession, ehDono, hashPassword, sha256, verifyPassword } from './a
 import { config } from './config.ts';
 import { query, queryOne, transaction } from './db.ts';
 import { enviarConviteUsuario, enviarRecuperacaoSenha } from './email.ts';
-import { atualizarSenhaDaCaixa } from './emails.ts';
 
 export const SENHA_MINIMA = 10;
 
@@ -115,7 +114,6 @@ export async function aceitarConvite(token: string, senha: string) {
     await client.query('UPDATE usuarios SET senha_hash = $2 WHERE id = $1', [convite.usuario_id, await hashPassword(senha)]);
     await client.query('DELETE FROM convites_usuario WHERE usuario_id = $1', [convite.usuario_id]);
   });
-  await atualizarSenhaDaCaixa(convite.email, senha);
   const sessao = await createSession(convite.usuario_id);
   const usuario: Usuario = { id: convite.usuario_id, email: convite.email, nome: convite.nome, dono: ehDono(convite.email) };
   return { usuario, sessao };
@@ -132,13 +130,12 @@ export async function trocarNome(id: number, nome: string): Promise<string> {
   return limpo;
 }
 
-// Changes the user's own password; a mailbox with the same address gets the same password.
+// Changes the user's own password.
 export async function trocarSenha(usuario: Usuario, atual: string, nova: string) {
   validarSenha(nova);
   const row = await queryOne<{ senha_hash: string | null }>('SELECT senha_hash FROM usuarios WHERE id = $1', [usuario.id]);
   if (!row?.senha_hash || !(await verifyPassword(atual, row.senha_hash))) throw new ErroUsuario('A senha atual não confere.', 403);
   await query('UPDATE usuarios SET senha_hash = $2 WHERE id = $1', [usuario.id, await hashPassword(nova)]);
-  return { caixaAtualizada: await atualizarSenhaDaCaixa(usuario.email, nova) };
 }
 
 // ---- Recuperar a senha ----
@@ -175,7 +172,6 @@ export async function redefinirSenha(token: string, senha: string) {
     await client.query('DELETE FROM convites_usuario WHERE usuario_id = $1', [link.usuario_id]);
     await client.query('DELETE FROM sessoes WHERE usuario_id = $1', [link.usuario_id]);
   });
-  await atualizarSenhaDaCaixa(link.email, senha);
   const sessao = await createSession(link.usuario_id);
   const usuario: Usuario = { id: link.usuario_id, email: link.email, nome: link.nome, dono: ehDono(link.email) };
   return { usuario, sessao };

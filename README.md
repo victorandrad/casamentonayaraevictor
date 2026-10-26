@@ -32,7 +32,7 @@ O site do nosso casamento: convite, confirmação de presença, lista de present
 | 📷 | **Álbum de fotos retrô** que abre como um livro, com páginas virando | Envio de fotos, legendas, momentos e ordem |
 | 💬 | **Mural de recados** | Moderação dos recados |
 | 🚪 | **Check-in na portaria** com leitor de QR | |
-| ✉️ | Recibo do presente por e-mail | E-mails `@casamentonayaraevictor.com.br`, usuários e convites |
+| ✉️ | Recibo do presente por e-mail | Reenvio de recibos, usuários e convites por e-mail |
 
 ---
 
@@ -158,8 +158,8 @@ No painel, cada convidado tem o botão **QR Code** (PNG em alta ou impressão) e
 
 ### 👥 Contas do painel
 
-- **Minha conta** (qualquer usuário): editar nome e trocar senha; os outros aparelhos conectados saem. A caixa de e-mail com o mesmo endereço acompanha a senha.
-- **Usuário master** (a conta do `ADMIN_EMAIL`): o único que vê as abas **E-mails** e **Configurações** e gerencia usuários. A API também barra os outros (403).
+- **Minha conta** (qualquer usuário): editar nome e trocar senha; os outros aparelhos conectados saem.
+- **Usuário master** (a conta do `ADMIN_EMAIL`): o único que vê a aba **Configurações** e gerencia usuários. A API também barra os outros (403).
 - **Convidar usuários** (só o master): o convidado recebe "Criar minha senha" com um link de uso único que vale 7 dias. Se o e-mail não sair, o painel mostra o link para copiar.
 - **Esqueci minha senha**: link de uso único que vale 1 hora. A resposta é sempre a mesma, exista a conta ou não, com limite de 3 e-mails por endereço e 10 pedidos por IP por hora.
 
@@ -242,32 +242,25 @@ Use a chave **live** e crie no Dashboard um webhook para `https://casamentonayar
 Quando um presente é pago, o convidado recebe um **recibo** no visual do site (itens, total, forma de pagamento, número do pedido e a mensagem dele). O envio acontece uma única vez por pedido, e a aba **Recebidos** mostra o status e tem **Reenviar recibo**. Convites e recuperação de senha do painel também saem por e-mail.
 
 - **Desenvolvimento:** o **Mailpit** recebe tudo em http://localhost:8025. Nada sai da sua máquina.
-- **Produção:** servidor de e-mail próprio, que **envia e recebe**. Ele roda em **outro projeto Docker** no mesmo VPS porque atende vários domínios. Remetente: `Nayara & Victor <nao-responder@casamentonayaraevictor.com.br>`.
+- **Produção:** servidor de e-mail compartilhado, que **só envia** (não há caixas, IMAP nem webmail). Ele roda em **outro projeto Docker** no mesmo VPS porque atende vários domínios. Remetente: `Nayara & Victor <nao-responder@casamentonayaraevictor.com.br>`.
 
 <details>
 <summary><b>Servidor de e-mail compartilhado (@casamentonayaraevictor.com.br)</b></summary>
 
-O servidor ([docker-mailserver](https://docker-mailserver.github.io/docker-mailserver/latest/), com webmail) é de outro projeto e serve vários domínios. Este site só faz duas coisas com ele:
-
-- **Gerencia as caixas e apelidos deste domínio** pela aba **E-mails** do painel. A API edita `postfix-accounts.cf` e `postfix-virtual.cf` na pasta de configuração do servidor, montada em `/mail-config`. Ela só vê e altera linhas `@casamentonayaraevictor.com.br`: as linhas e os comentários dos outros domínios ficam como estão. A caixa do `ADMIN_EMAIL` usa a mesma senha do login do painel.
-- **Envia recibos, convites e recuperação de senha** pela porta 25, sem login, entrando na rede Docker do projeto de e-mail.
+O servidor é de outro projeto e serve vários domínios. Ele **só envia**: não recebe e-mails, não tem caixas, IMAP nem webmail. Este site só o usa para **enviar recibos, convites e recuperação de senha** (remetente `nao-responder@`) pela porta 25, sem login, entrando na rede Docker do projeto de e-mail.
 
 **No `/opt/casamento/.env` do servidor** (veja [docker/.env.producao.example](docker/.env.producao.example)):
 
 | Variável | Para quê |
 | --- | --- |
-| `MAIL_CONFIG_PATH` | pasta `config` do docker-mailserver. O uid 1000 (usuário da API) precisa ter permissão de escrita |
 | `EMAIL_REDE` | rede Docker do projeto de e-mail (padrão `email`), que precisa existir antes do deploy |
 | `MAIL_HOSTNAME` | nome do servidor, o mesmo do certificado (padrão `mail.casamentonayaraevictor.com.br`). Precisa ser alias do container nessa rede, porque o STARTTLS confere o nome |
-| `WEBMAIL_URL` | link do webmail no painel (padrão `https://MAIL_HOSTNAME`) |
 
 **No projeto de e-mail:** coloque a rede da API em `PERMIT_DOCKER` (ou `connected-networks`) para ela poder enviar sem login. Configure também o DKIM de `casamentonayaraevictor.com.br`.
 
-**DNS do domínio (Registro.br):** `MX` → `MAIL_HOSTNAME`, SPF `v=spf1 mx -all`, a chave DKIM gerada no projeto de e-mail e DMARC `v=DMARC1; p=quarantine; adkim=s; aspf=s`.
+**DNS do domínio (Registro.br):** SPF autorizando o servidor (ex.: `v=spf1 a:mail.casamentonayaraevictor.com.br -all`; sem `MX`, já que ele não recebe), a chave DKIM gerada no projeto de e-mail e DMARC `v=DMARC1; p=quarantine; adkim=s; aspf=s`.
 
-**No celular, Outlook ou Thunderbird:** conta IMAP com o endereço completo como usuário e servidor `MAIL_HOSTNAME`. Entrada na porta 993 (SSL/TLS) e saída na 587 (STARTTLS).
-
-**Localmente** não há servidor de e-mail. A aba E-mails grava num volume vazio e os envios caem no Mailpit.
+**Localmente** não há servidor de e-mail: os envios caem no Mailpit.
 
 </details>
 
@@ -317,7 +310,7 @@ Em *Settings → Secrets and variables → Actions*. A cada deploy o job manda o
 | Tipo | Nome | Para quê |
 | --- | --- | --- |
 | Secret | `VPS_SSH_KEY` | chave do deploy (presa ao `casamento-deploy`) |
-| Secret | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | dono do painel e a caixa de e-mail com esse endereço (no servidor compartilhado) |
+| Secret | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | login do dono do painel (usuário master) |
 | Secret | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe em modo real |
 | Variable | `ADMIN_NOME`, `EMAIL_FROM`, `EMAIL_REPLY_TO` | nome no painel e remetente dos e-mails |
 

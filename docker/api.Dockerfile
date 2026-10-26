@@ -19,8 +19,8 @@ COPY packages/shared/src/galeria.ts packages/shared/src/galeria.ts
 COPY apps/api/src apps/api/src
 COPY apps/api/migrations apps/api/migrations
 
-# Uploaded gift photos and the mail server config folder (both volumes in compose.yaml)
-RUN mkdir -p /app/uploads /mail-config && chown node:node /app/uploads /mail-config
+# Uploaded gift photos (a volume in compose.yaml)
+RUN mkdir -p /app/uploads && chown node:node /app/uploads
 ENV UPLOADS_DIR=/app/uploads
 
 WORKDIR /app/apps/api

@@ -74,12 +74,8 @@ function SenhaModal({ usuario, onFechar, onTrocada }: { usuario: Usuario; onFech
     setSalvando(true);
     setErro('');
     try {
-      const r = await adminApi<{ caixaAtualizada: boolean }>('/admin/conta/senha', { method: 'PUT', body: { senhaAtual: atual, senhaNova: nova } });
-      onTrocada(
-        r.caixaAtualizada
-          ? `Senha trocada. A caixa de e-mail ${usuario.email} também passou a usar a nova senha.`
-          : 'Senha trocada. Os outros aparelhos conectados saíram do painel.',
-      );
+      await adminApi('/admin/conta/senha', { method: 'PUT', body: { senhaAtual: atual, senhaNova: nova } });
+      onTrocada('Senha trocada. Os outros aparelhos conectados saíram do painel.');
       onFechar();
     } catch (error) {
       setErro(errorMessage(error));

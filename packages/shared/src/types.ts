@@ -61,19 +61,6 @@ export type LoginInput = { email: string; senha: string };
 export type FotoGaleria = { id: number; url: string; legenda: string; momento: string; ordem: number };
 export type FotoGaleriaInput = { url: string; legenda: string; momento: string };
 
-// Mailboxes of the couple's own mail server, managed in the panel (E-mails tab).
-export type CaixaEmail = { endereco: string };
-export type ApelidoEmail = { endereco: string; destinos: string[] };
-export type EmailsAdmin = {
-  disponivel: boolean; // false when the mail server is not set up here (e.g. local dev)
-  dominio: string;
-  caixas: CaixaEmail[];
-  apelidos: ApelidoEmail[];
-  // Mailbox whose password is the panel login's (ADMIN_PASSWORD); managed by the deploy, not here.
-  caixaDoPainel: string | null;
-  servidor: { imap: string; smtp: string; webmail: string };
-};
-
 export type Resumo = {
   convidados: number;
   responderam: number;

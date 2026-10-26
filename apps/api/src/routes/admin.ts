@@ -6,7 +6,6 @@ import { destroyOtherSessions, requireAuth, requireOwner, SESSION_COOKIE } from 
 import * as repo from '../repo.ts';
 import { enviarReciboDoPedido, listarPedidos } from '../pedidos.ts';
 import { ImagemInvalida, LADO_GALERIA, LADO_PRESENTE, removerImagem, salvarImagem, TIPOS_ACEITOS } from '../uploads.ts';
-import * as emails from '../emails.ts';
 import * as usuarios from '../usuarios.ts';
 
 const idParams = {
@@ -69,30 +68,15 @@ const categoriaBody = {
   },
 } as const;
 
-const enderecoParams = {
-  type: 'object',
-  required: ['endereco'],
-  properties: { endereco: { type: 'string', minLength: 3, maxLength: 254 } },
-} as const;
-
-const senhaBody = {
-  type: 'object',
-  required: ['senha'],
-  additionalProperties: false,
-  properties: { senha: { type: 'string', minLength: emails.SENHA_MINIMA, maxLength: 200 } },
-} as const;
-
-const destinosSchema = { type: 'array', minItems: 1, maxItems: 20, items: { type: 'string', maxLength: 254 } } as const;
-
 const notFound = { erro: 'Item não encontrado.' };
 
 export async function adminRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAuth);
-  // E-mails and changing the settings are for the master only (the settings stay readable: the gift
-  // list shows the fee from them).
+  // Changing the settings is for the master only (the settings stay readable: the gift list shows
+  // the fee from them).
   app.addHook('preHandler', async (req, reply) => {
     const rota = req.routeOptions.url ?? '';
-    if (rota.startsWith('/api/admin/emails') || (rota === '/api/admin/configuracoes' && req.method !== 'GET')) {
+    if (rota === '/api/admin/configuracoes' && req.method !== 'GET') {
       return requireOwner(req, reply);
     }
   });
@@ -136,9 +120,9 @@ export async function adminRoutes(app: FastifyInstance) {
     },
     async (req, reply) =>
       comErroDeUsuario(reply, async () => {
-        const resultado = await usuarios.trocarSenha(req.usuario!, req.body.senhaAtual, req.body.senhaNova);
+        await usuarios.trocarSenha(req.usuario!, req.body.senhaAtual, req.body.senhaNova);
         await destroyOtherSessions(req.usuario!.id, req.cookies[SESSION_COOKIE]);
-        return resultado;
+        return reply.code(204).send();
       }),
   );
 
@@ -428,94 +412,6 @@ export async function adminRoutes(app: FastifyInstance) {
     await removerImagem(anterior?.fotoUrl);
     return reply.code(204).send();
   });
-
-  // E-mails do domínio (caixas e apelidos do servidor de e-mail próprio)
-  const comErroDeEmail = async (reply: FastifyReply, fn: () => Promise<unknown>) => {
-    try {
-      return await fn();
-    } catch (error) {
-      if (error instanceof emails.ErroEmail) return reply.code(error.status).send({ erro: error.message });
-      throw error;
-    }
-  };
-
-  app.get('/emails', async () => emails.listar());
-
-  app.post<{ Body: { usuario: string; senha: string } }>(
-    '/emails/caixas',
-    {
-      schema: {
-        body: {
-          type: 'object',
-          required: ['usuario', 'senha'],
-          additionalProperties: false,
-          properties: { usuario: { type: 'string', minLength: 1, maxLength: 254 }, senha: senhaBody.properties.senha },
-        },
-      },
-    },
-    async (req, reply) =>
-      comErroDeEmail(reply, async () => reply.code(201).send(await emails.criarCaixa(req.body.usuario, req.body.senha))),
-  );
-
-  app.put<{ Params: { endereco: string }; Body: { senha: string } }>(
-    '/emails/caixas/:endereco/senha',
-    { schema: { params: enderecoParams, body: senhaBody } },
-    async (req, reply) =>
-      comErroDeEmail(reply, async () => {
-        await emails.trocarSenha(req.params.endereco, req.body.senha);
-        return reply.code(204).send();
-      }),
-  );
-
-  app.delete<{ Params: { endereco: string } }>(
-    '/emails/caixas/:endereco',
-    { schema: { params: enderecoParams } },
-    async (req, reply) =>
-      comErroDeEmail(reply, async () => {
-        await emails.excluirCaixa(req.params.endereco);
-        return reply.code(204).send();
-      }),
-  );
-
-  app.post<{ Body: { usuario: string; destinos: string[] } }>(
-    '/emails/apelidos',
-    {
-      schema: {
-        body: {
-          type: 'object',
-          required: ['usuario', 'destinos'],
-          additionalProperties: false,
-          properties: { usuario: { type: 'string', minLength: 1, maxLength: 254 }, destinos: destinosSchema },
-        },
-      },
-    },
-    async (req, reply) =>
-      comErroDeEmail(reply, async () =>
-        reply.code(201).send(await emails.salvarApelido(req.body.usuario, req.body.destinos, true)),
-      ),
-  );
-
-  app.put<{ Params: { endereco: string }; Body: { destinos: string[] } }>(
-    '/emails/apelidos/:endereco',
-    {
-      schema: {
-        params: enderecoParams,
-        body: { type: 'object', required: ['destinos'], additionalProperties: false, properties: { destinos: destinosSchema } },
-      },
-    },
-    async (req, reply) =>
-      comErroDeEmail(reply, async () => emails.salvarApelido(req.params.endereco, req.body.destinos, false)),
-  );
-
-  app.delete<{ Params: { endereco: string } }>(
-    '/emails/apelidos/:endereco',
-    { schema: { params: enderecoParams } },
-    async (req, reply) =>
-      comErroDeEmail(reply, async () => {
-        await emails.excluirApelido(req.params.endereco);
-        return reply.code(204).send();
-      }),
-  );
 
   // Presentes recebidos (pedidos do Stripe)
   app.get('/pedidos', async () => listarPedidos());

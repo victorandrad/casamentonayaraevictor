@@ -7,7 +7,6 @@ import { Recados } from './abas/Recados';
 import { Presentes } from './abas/Presentes';
 import { Recebidos } from './abas/Recebidos';
 import { Configuracoes } from './abas/Configuracoes';
-import { Emails } from './abas/Emails';
 import { Galeria } from './abas/Galeria';
 import { Conta } from './abas/Conta';
 
@@ -18,7 +17,6 @@ const abas = [
   { id: 'recebidos', label: 'Recebidos', icon: 'gift' },
   { id: 'presentes', label: 'Lista de presentes', icon: 'home' },
   { id: 'galeria', label: 'Galeria', icon: 'camera' },
-  { id: 'emails', label: 'E-mails', icon: 'envelope', master: true },
   { id: 'configuracoes', label: 'Configurações', icon: 'calendar', master: true },
   { id: 'conta', label: 'Minha conta', icon: 'lock' },
 ] as const satisfies ReadonlyArray<{ id: string; label: string; icon: IconName; master?: boolean }>;
@@ -27,7 +25,7 @@ type AbaId = (typeof abas)[number]['id'];
 
 export function Dashboard({ usuario, onSair, onUsuario }: { usuario: Usuario; onSair: () => void; onUsuario: (u: Usuario) => void }) {
   const [aba, setAba] = useState<AbaId>('resumo');
-  // E-mails and Configurações only for the master user (the API enforces it too).
+  // Configurações only for the master user (the API enforces it too).
   const visiveis = abas.filter((a) => !('master' in a) || usuario.dono);
   const barra = useRef<HTMLElement>(null);
 
@@ -79,7 +77,6 @@ export function Dashboard({ usuario, onSair, onUsuario }: { usuario: Usuario; on
         {aba === 'recebidos' && <Recebidos />}
         {aba === 'presentes' && <Presentes />}
         {aba === 'galeria' && <Galeria />}
-        {aba === 'emails' && usuario.dono && <Emails />}
         {aba === 'configuracoes' && usuario.dono && <Configuracoes usuario={usuario} />}
         {aba === 'conta' && <Conta usuario={usuario} onUsuario={onUsuario} />}
       </main>

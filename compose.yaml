@@ -2,8 +2,8 @@
 #
 #   docker compose up -d --build                  → banco, API e Mailpit (os front-ends rodam no npm run dev)
 #
-# O servidor de e-mail de produção é outro projeto Docker (atende vários domínios); a API só edita
-# as caixas deste domínio na pasta de configuração dele.
+# O servidor de e-mail de produção é outro projeto Docker (atende vários domínios e só envia); a API
+# manda os e-mails por ele, sem login.
 #   docker compose --profile site up -d --build   → + o site completo no Nginx: http://localhost:8088
 #   docker compose --profile stripe up -d         → + Stripe CLI repassando os webhooks de teste
 #
@@ -53,17 +53,10 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       EMAIL_FROM: ${EMAIL_FROM:-Nayara & Victor <nao-responder@nayaraevictor.local>}
       EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-}
-      # Mailboxes of this domain managed from the panel. The mail server itself lives in another
-      # Docker project (it serves several domains); the API only edits its config folder.
-      MAIL_DOMAIN: ${MAIL_DOMAIN:-casamento.localhost}
-      MAIL_CONFIG_DIR: /mail-config
     ports:
       - "${API_PORT:-4100}:4100"
     volumes:
       - uploads-data:/app/uploads
-      # Config folder of the mail server (postfix-accounts.cf / postfix-virtual.cf). Locally an
-      # empty volume; on the server, the folder of the mail server's project (MAIL_CONFIG_PATH).
-      - ${MAIL_CONFIG_PATH:-mail-config}:/mail-config
     depends_on:
       db:
         condition: service_healthy
@@ -122,4 +115,3 @@ volumes:
   db-data:
   uploads-data:
   mail-data:
-  mail-config:
