@@ -515,3 +515,57 @@
 .presentes-card.is-presenteado:hover { transform: none; box-shadow: none; }
 .presentes-card__cta:disabled { cursor: default; opacity: 0.7; }
 .presentes-card__cta:disabled:hover { background: none; }
+
+/* Category filter and pagination */
+.presentes-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: 40px 0 0;
+}
+.presentes-filtro {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border: 1px solid var(--nv-border);
+  border-radius: 999px;
+  background: var(--nv-card);
+  font-family: var(--nv-sans);
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  color: var(--nv-text);
+  cursor: pointer;
+  transition: all 0.25s var(--nv-ease);
+}
+.presentes-filtro:hover { border-color: var(--nv-rose); color: var(--nv-rose-deep); }
+.presentes-filtro.is-active { background: var(--nv-rose); border-color: var(--nv-rose); color: #fff; }
+.presentes-topo { scroll-margin-top: 110px; }
+
+.presentes-paginacao {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin: 48px 0 0;
+}
+.presentes-paginacao__nav { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; }
+.presentes-paginacao__nav button {
+  min-width: 40px;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--nv-border);
+  border-radius: 999px;
+  background: var(--nv-card);
+  font-family: var(--nv-sans);
+  font-size: 14px;
+  color: var(--nv-text);
+  cursor: pointer;
+  transition: all 0.25s var(--nv-ease);
+}
+.presentes-paginacao__nav button:hover:not(:disabled) { border-color: var(--nv-rose); color: var(--nv-rose-deep); }
+.presentes-paginacao__nav button:disabled { opacity: 0.4; cursor: default; }
+.presentes-paginacao__nav button.is-active { background: var(--nv-rose); border-color: var(--nv-rose); color: #fff; }
+.presentes-paginacao__gap { padding: 0 4px; color: var(--nv-taupe); }
+.presentes-paginacao__info { font-size: 12px; letter-spacing: 0.5px; color: var(--nv-taupe); }

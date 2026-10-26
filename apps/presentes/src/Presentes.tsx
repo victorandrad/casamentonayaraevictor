@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { EstadoVazio, Icon, Placeholder, SectionHeader, type IconName } from '@nv/shared';
 import { api, errorMessage, formatBRL } from '@nv/shared/api';
 import { precoComTaxa } from '@nv/shared/taxas';
@@ -8,6 +8,7 @@ import { useCarrinho } from './carrinho';
 import { Checkout } from './Checkout';
 import { cancelarPagamentoPendente, lerRetornoDoStripe, limparRetornoDaUrl } from './pagamento';
 import { RetornoPagamento } from './RetornoPagamento';
+import { Paginacao, POR_PAGINA, gravarFiltroNaUrl, lerFiltroDaUrl, type Filtro } from './Paginacao';
 import './presentes.css';
 
 type GridProps = {
@@ -89,6 +90,8 @@ export default function Presentes() {
   const [retorno] = useState(lerRetornoDoStripe);
   const [retornoAberto, setRetornoAberto] = useState(retorno?.tipo === 'sucesso');
   const [avisoCancelado, setAvisoCancelado] = useState(retorno?.tipo === 'cancelado');
+  const [filtro, setFiltro] = useState<Filtro>(lerFiltroDaUrl);
+  const topoDaLista = useRef<HTMLDivElement>(null);
   const carrinho = useCarrinho();
 
   // Coming back from Stripe: drop ?pedido from the URL so a reload doesn't repeat it.
@@ -139,6 +142,29 @@ export default function Presentes() {
 
   const noCarrinho = (id: string) => carrinho.itens.find((i) => i.id === id)?.quantidade ?? 0;
 
+  // Client-side pagination: the cart syncs against the whole list, and a wedding
+  // list has at most a few hundred gifts, so it all comes in one request.
+  const comPresentes = lista ? lista.categorias.filter((c) => lista.presentes.some((p) => p.categoriaId === c.id)) : [];
+  // A category from an old link that no longer has gifts falls back to "all".
+  const categoria = comPresentes.some((c) => c.id === filtro.categoria) ? filtro.categoria : null;
+  const filtrados = lista ? lista.presentes.filter((p) => categoria === null || p.categoriaId === categoria) : [];
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
+  const pagina = Math.min(filtro.pagina, totalPaginas);
+  const visiveis = filtrados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
+
+  // Once the list is in, keep the URL on the page actually shown (out-of-range pages are clamped).
+  useEffect(() => {
+    if (lista) gravarFiltroNaUrl({ categoria, pagina });
+  }, [lista, categoria, pagina]);
+
+  const irParaPagina = (n: number) => {
+    setFiltro({ categoria, pagina: n });
+    topoDaLista.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  // Changing category always starts again at page 1.
+  const escolherCategoria = (id: number | null) => setFiltro({ categoria: id, pagina: 1 });
+
   return (
     <section id="presentes" className="nv-section">
       <div className="nv-container--wide">
@@ -174,10 +200,30 @@ export default function Presentes() {
             Em breve os presentes estarão aqui. Enquanto isso, o que mais importa é a sua presença no nosso dia. ♥
           </EstadoVazio>
         )}
+        {/* Where a page change scrolls back to: the filters, then the gifts. */}
+        <div ref={topoDaLista} className="presentes-topo" />
+        {lista && comPresentes.length > 1 && (
+          <div className="presentes-filtros" role="group" aria-label="Filtrar por categoria">
+            <button className={categoria === null ? 'presentes-filtro is-active' : 'presentes-filtro'} aria-pressed={categoria === null} onClick={() => escolherCategoria(null)}>
+              Todos
+            </button>
+            {comPresentes.map((c) => (
+              <button
+                key={c.id}
+                className={categoria === c.id ? 'presentes-filtro is-active' : 'presentes-filtro'}
+                aria-pressed={categoria === c.id}
+                onClick={() => escolherCategoria(c.id)}
+              >
+                <Icon name={iconeDaCategoria(c.icone)} size={16} />
+                {c.nome}
+              </button>
+            ))}
+          </div>
+        )}
         {lista &&
-          // Categories come in the couple's order; empty ones are skipped.
+          // Categories come in the couple's order; those with nothing on this page are skipped.
           lista.categorias.map((c) => {
-            const gifts = lista.presentes.filter((p) => p.categoriaId === c.id);
+            const gifts = visiveis.filter((p) => p.categoriaId === c.id);
             return gifts.length ? (
               <GiftGrid
                 key={c.id}
@@ -190,6 +236,7 @@ export default function Presentes() {
               />
             ) : null;
           })}
+        <Paginacao pagina={pagina} totalPaginas={totalPaginas} total={filtrados.length} onPagina={irParaPagina} />
       </div>
 
       {/* Back from the payment page without paying: a small note pinned above the cart, pointing at it. */}
