@@ -7,6 +7,7 @@ import { Verse } from './components/Verse';
 import { Petals } from './components/Petals';
 import { Footer } from './components/Footer';
 import { MapaMaroto } from './components/MapaMaroto';
+import { AvisoCookies } from './components/AvisoCookies';
 
 const Evento = lazy(() => import('evento/Evento'));
 const Traje = lazy(() => import('evento/Traje'));
@@ -84,6 +85,7 @@ export function App() {
       <Footer onReverMapa={reverMapa} />
       <Petals />
       <RemoteSlot name="rsvp/Portaria" component={Portaria} />
+      <AvisoCookies />
       {mapa && <MapaMaroto onFim={fecharMapa} />}
     </>
   );

@@ -1,4 +1,4 @@
-import { Branch, casamento } from '@nv/shared';
+import { abrirPreferenciasDeCookies, Branch, casamento } from '@nv/shared';
 
 export function Footer({ onReverMapa }: { onReverMapa: () => void }) {
   return (
@@ -19,6 +19,9 @@ export function Footer({ onReverMapa }: { onReverMapa: () => void }) {
       <p className="shell-footer__note">Feito com amor para celebrar o nosso dia.</p>
       <button className="shell-footer__mapa" onClick={onReverMapa}>
         ✦ Rever o mapa
+      </button>
+      <button className="shell-footer__cookies" onClick={abrirPreferenciasDeCookies}>
+        Cookies e privacidade
       </button>
     </footer>
   );
