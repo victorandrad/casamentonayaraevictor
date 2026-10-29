@@ -1,19 +1,32 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icon, Ornament } from '@nv/shared';
-import { errorMessage, formatBRL } from '@nv/shared/api';
+import { ApiError, errorMessage, formatBRL } from '@nv/shared/api';
 import type { PedidoPublico } from '@nv/shared/types';
-import { consultarPedido } from './pagamento';
+import { consultarPedido, esquecerPedidoAberto } from './pagamento';
 
-// `uid`: the order's public UUID from the return URL.
+// `uid`: the order's public UUID.
 type Props = { uid: string; onConcluido: () => void; onFechar: () => void };
 
-const TENTATIVAS = 6;
+// A payment Mercado Pago hasn't confirmed yet: ask for about 45 seconds.
+const TENTATIVAS = 15;
+const INTERVALO_PENDENTE = 3000;
+// While a Pix waits, check often at first (most are paid within a couple of minutes), then less.
+const INTERVALO_PIX = 5000;
+const INTERVALO_PIX_DEPOIS = 15_000;
+const CONSULTAS_RAPIDAS = 24;
 
-// Shown when Mercado Pago sends the guest back. Polls briefly because the payment
-// confirmation (webhook) can land a few seconds after the redirect.
+const horario = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+// The order's screen after paying in the site: thank-you for an approved card, the Pix code while
+// it waits (followed until it is paid or expires), or what went wrong.
 export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
   const [pedido, setPedido] = useState<PedidoPublico | null>(null);
   const [erro, setErro] = useState('');
+  const [copiado, setCopiado] = useState(false);
+  const [desistiu, setDesistiu] = useState(false);
+  // The cart is cleared once, not on every check.
+  const concluido = useRef(false);
+  const ultimo = useRef<PedidoPublico | null>(null);
 
   useEffect(() => {
     let ativo = true;
@@ -23,10 +36,31 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
         const p = await consultarPedido(uid);
         if (!ativo) return;
         setPedido(p);
-        if (p.status === 'pago' || p.status === 'aguardando') onConcluido();
-        if (p.status === 'pendente' && tentativa < TENTATIVAS) timer = setTimeout(() => buscar(tentativa + 1), 2000);
+        ultimo.current = p;
+        if ((p.status === 'pago' || p.status === 'aguardando') && !concluido.current) {
+          concluido.current = true;
+          onConcluido();
+        }
+        // Settled one way or the other: nothing to show again on the next visit.
+        if (p.status !== 'aguardando' && p.status !== 'pendente') esquecerPedidoAberto();
+        if (p.status === 'pendente') {
+          if (tentativa < TENTATIVAS) timer = setTimeout(() => buscar(tentativa + 1), INTERVALO_PENDENTE);
+          else setDesistiu(true);
+        }
+        if (p.status === 'aguardando' && p.pix) {
+          timer = setTimeout(() => buscar(tentativa + 1), tentativa < CONSULTAS_RAPIDAS ? INTERVALO_PIX : INTERVALO_PIX_DEPOIS);
+        }
       } catch (error) {
-        if (ativo) setErro(errorMessage(error));
+        if (!ativo) return;
+        // An order that doesn't exist (any more): don't bring it back on the next visit.
+        if (error instanceof ApiError && error.status === 404) {
+          esquecerPedidoAberto();
+          setErro(errorMessage(error));
+          return;
+        }
+        // A network blip (common on a phone during a Pix): keep what is on screen and try again.
+        if (ultimo.current) timer = setTimeout(() => buscar(tentativa + 1), INTERVALO_PIX_DEPOIS);
+        else setErro(errorMessage(error));
       }
     };
     buscar(1);
@@ -47,11 +81,25 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
     document.getElementById('recados')?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const copiarPix = async () => {
+    if (!pedido?.pix) return;
+    try {
+      await navigator.clipboard.writeText(pedido.pix.codigo);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    } catch {
+      // clipboard blocked: the code is on screen to copy by hand
+    }
+  };
+
   const status = pedido?.status;
+  const pix = status === 'aguardando' ? pedido?.pix : null;
   const titulo =
     status === 'pago'
       ? 'Muito obrigado!'
-      : status === 'aguardando'
+      : pix
+        ? 'Pague com Pix'
+        : status === 'aguardando'
         ? 'Quase lá!'
         : status === 'falhou' || status === 'expirado' || status === 'estornado'
           ? 'Pagamento não concluído'
@@ -82,18 +130,40 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
                 {pedido!.nome.split(' ')[0]}, seu presente chegou! Ele vai fazer parte do começo da nossa nova vida.
               </p>
             )}
-            {status === 'aguardando' && (
+            {pix && (
+              <div className="retorno__pix">
+                <p className="retorno__text">
+                  Abra o app do seu banco, escolha pagar com Pix e escaneie o código ou use o copia e cola.
+                  {pix.expiraEm && ` O presente fica guardado para você até ${horario(pix.expiraEm)}.`}
+                </p>
+                {pix.qrBase64 && <img className="retorno__qr" src={`data:image/png;base64,${pix.qrBase64}`} alt="QR Code do Pix" />}
+                <div className="retorno__copia">
+                  <input className="nv-input" readOnly value={pix.codigo} aria-label="Código Pix copia e cola" onFocus={(e) => e.target.select()} />
+                  <button className="nv-btn-outline" onClick={copiarPix}>
+                    {copiado ? '✓ Copiado' : 'Copiar'}
+                  </button>
+                </div>
+                <p className="retorno__aguardando" role="status">
+                  <span className="retorno__ponto" aria-hidden /> Esperando a confirmação do banco. Esta tela atualiza sozinha.
+                </p>
+              </div>
+            )}
+            {status === 'aguardando' && !pix && (
               <p className="retorno__text">
                 Recebemos seu pedido. Assim que o pagamento for confirmado pelo banco, o presente chega para nós.
               </p>
             )}
             {(status === 'falhou' || status === 'expirado' || status === 'estornado') && (
               <p className="retorno__text">
-                O pagamento não foi concluído e nada foi cobrado. Seus presentes continuam no carrinho para tentar de novo.
+                O pagamento não foi concluído e nada foi cobrado. Se ainda quiser presentear, é só escolher o presente na lista de novo.
               </p>
             )}
             {(!status || status === 'pendente') && (
-              <p className="retorno__text">Estamos aguardando a confirmação do pagamento. Isso leva só alguns segundos.</p>
+              <p className="retorno__text">
+                {desistiu
+                  ? 'O Mercado Pago ainda não confirmou o pagamento. Não pague de novo: se o valor foi cobrado, o presente chega aos noivos e você recebe o recibo por e-mail. Você pode fechar e voltar mais tarde.'
+                  : 'Estamos aguardando a confirmação do pagamento. Isso leva só alguns segundos.'}
+              </p>
             )}
 
             {pedido && pedido.itens.length > 0 && (

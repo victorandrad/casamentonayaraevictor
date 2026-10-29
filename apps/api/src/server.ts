@@ -4,6 +4,7 @@ import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import { config } from './config.ts';
 import { pool } from './db.ts';
+import { conciliarPendentes } from './pedidos.ts';
 import { migrate } from './migrate.ts';
 import { publicRoutes } from './routes/public.ts';
 import { authRoutes } from './routes/auth.ts';
@@ -14,7 +15,10 @@ import { garantirPastaUploads, MAX_UPLOAD_BYTES, UPLOADS_PREFIX } from './upload
 
 const app = Fastify({
   logger: { level: config.isProduction ? 'info' : 'debug', redact: ['req.headers.cookie', 'res.headers["set-cookie"]'] },
-  trustProxy: true,
+  // Exactly the proxies in front of the API (Traefik, then the site's nginx): req.ip is the address
+  // Traefik saw, so a client can't pick its own IP with a forged X-Forwarded-For (the rate limits
+  // on payments rely on it).
+  trustProxy: (_endereco: string, salto: number) => salto < 2,
   bodyLimit: 32 * 1024,
 });
 
@@ -64,6 +68,10 @@ await app.register(adminRoutes, { prefix: '/api/admin' });
 
 await migrate((msg) => app.log.info(msg));
 await app.listen({ port: config.port, host: '0.0.0.0' });
+
+// Payments Mercado Pago didn't answer clearly get settled in the background.
+const conciliacao = setInterval(() => void conciliarPendentes().catch((error) => app.log.warn(error)), 2 * 60_000);
+conciliacao.unref();
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, async () => {

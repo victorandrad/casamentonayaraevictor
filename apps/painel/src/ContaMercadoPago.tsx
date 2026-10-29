@@ -230,21 +230,29 @@ export function ContaMercadoPago() {
 
       {data && !editandoAplicacao && conta && (
         <>
+          {conta.precisaReconectar && (
+            <p className="painel-alert" role="alert">
+              O pagamento agora acontece dentro do site e precisa de uma autorização nova do Mercado Pago. Clique em
+              “Conectar de novo” e entre com a mesma conta: até lá, o site não aceita pagamentos.
+            </p>
+          )}
           <div className="painel-mp__conta">
-            <span className="painel-badge painel-badge--sim">Conectada</span>
+            <span className={conta.precisaReconectar ? 'painel-badge painel-badge--pendente' : 'painel-badge painel-badge--sim'}>
+              {conta.precisaReconectar ? 'Reconectar' : 'Conectada'}
+            </span>
             {!conta.producao && <span className="painel-badge painel-badge--pendente">Conta de teste</span>}
             <strong>{conta.apelido ?? conta.email ?? `Conta ${conta.usuarioId}`}</strong>
             {conta.email && conta.apelido && <span>{conta.email}</span>}
           </div>
           <p className="painel-hint">
-            Os convidados pagam com Pix ou cartão em até 12x no Mercado Pago, e o valor cai nesta conta. Conectada em{' '}
+            Os convidados pagam com Pix ou cartão em até 12x dentro do site, pelo Mercado Pago, e o valor cai nesta conta. Conectada em{' '}
             {formatDate(conta.conectadaEm)}
             {conta.conectadaPor ? ` por ${conta.conectadaPor}` : ''}. A autorização é renovada sozinha.
             {!conta.producao && ' Esta é uma conta de teste: nenhum pagamento é real.'}
           </p>
           <div className="painel-mp__acoes">
             <button className="nv-btn-ghost" onClick={conectar} disabled={indo}>
-              {indo ? 'Abrindo o Mercado Pago…' : 'Trocar de conta'}
+              {indo ? 'Abrindo o Mercado Pago…' : conta.precisaReconectar ? 'Conectar de novo' : 'Trocar de conta'}
             </button>
             <button className="painel-link painel-link--danger" onClick={() => setDesconectando(true)}>
               Desconectar

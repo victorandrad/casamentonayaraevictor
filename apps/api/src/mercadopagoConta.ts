@@ -98,6 +98,7 @@ export async function salvarAplicacao(clientId: string, clientSecret: string, us
 type Tokens = {
   access_token: string;
   refresh_token: string;
+  public_key?: string;
   user_id: number;
   expires_in: number;
   live_mode: boolean;
@@ -146,12 +147,12 @@ export async function concluirConexao(usuarioId: number, estado: string, codigo:
   });
   const perfil = await perfilDaConta(tokens.access_token);
   await query(
-    `INSERT INTO mercadopago_conta (id, usuario_mp, apelido, email, access_token, refresh_token, producao, expira_em, conectada_por)
-     VALUES (1, $1, $2, $3, $4, $5, $6, now() + make_interval(secs => $7), $8)
+    `INSERT INTO mercadopago_conta (id, usuario_mp, apelido, email, access_token, refresh_token, producao, expira_em, conectada_por, public_key)
+     VALUES (1, $1, $2, $3, $4, $5, $6, now() + make_interval(secs => $7), $8, $9)
      ON CONFLICT (id) DO UPDATE
         SET usuario_mp = EXCLUDED.usuario_mp, apelido = EXCLUDED.apelido, email = EXCLUDED.email,
             access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token,
-            producao = EXCLUDED.producao, expira_em = EXCLUDED.expira_em,
+            producao = EXCLUDED.producao, expira_em = EXCLUDED.expira_em, public_key = EXCLUDED.public_key,
             conectada_em = now(), conectada_por = EXCLUDED.conectada_por, renovada_em = NULL`,
     [
       tokens.user_id,
@@ -162,6 +163,7 @@ export async function concluirConexao(usuarioId: number, estado: string, codigo:
       tokens.live_mode,
       tokens.expires_in,
       usuarioId,
+      tokens.public_key ?? null,
     ],
   );
 }
@@ -194,12 +196,13 @@ type ContaRow = {
   expira_em: Date;
   conectada_em: Date;
   conectada_por_nome: string | null;
+  public_key: string | null;
 };
 
 const lerConta = () =>
   queryOne<ContaRow>(
     `SELECT c.usuario_mp, c.apelido, c.email, c.access_token, c.refresh_token, c.producao, c.expira_em, c.conectada_em,
-            u.nome AS conectada_por_nome
+            c.public_key, u.nome AS conectada_por_nome
        FROM mercadopago_conta c LEFT JOIN usuarios u ON u.id = c.conectada_por`,
   );
 
@@ -217,6 +220,8 @@ export async function situacao(): Promise<ContaMercadoPago> {
       conectadaEm: conta.conectada_em.toISOString(),
       conectadaPor: conta.conectada_por_nome,
       expiraEm: conta.expira_em.toISOString(),
+      // Connected before the in-site checkout: no public key, so it must be connected again.
+      precisaReconectar: !conta.public_key,
     },
   };
 }
@@ -255,9 +260,10 @@ async function renovar(conta: ContaRow): Promise<string | null> {
     const tokens = await pedirTokens(aplicacao, { grant_type: 'refresh_token', refresh_token: decifrar(conta.refresh_token) });
     await query(
       `UPDATE mercadopago_conta
-          SET access_token = $1, refresh_token = $2, expira_em = now() + make_interval(secs => $3), renovada_em = now()
+          SET access_token = $1, refresh_token = $2, expira_em = now() + make_interval(secs => $3), renovada_em = now(),
+              public_key = coalesce($5, public_key)
         WHERE usuario_mp = $4`,
-      [cifrar(tokens.access_token), cifrar(tokens.refresh_token), tokens.expires_in, conta.usuario_mp],
+      [cifrar(tokens.access_token), cifrar(tokens.refresh_token), tokens.expires_in, conta.usuario_mp, tokens.public_key ?? null],
     );
     console.info('token do Mercado Pago renovado');
     return tokens.access_token;
@@ -265,4 +271,12 @@ async function renovar(conta: ContaRow): Promise<string | null> {
     console.warn('não foi possível renovar o token do Mercado Pago:', (error as Error).message);
     return null;
   }
+}
+
+// What the guest's browser needs to show the payment form: the connected account's public key
+// (public by design: it only lets the Brick tokenize cards for this account). Null while payments
+// are unavailable (no account, or one connected before the in-site checkout).
+export async function chavePublica(): Promise<string | null> {
+  const conta = await lerConta();
+  return conta?.public_key ?? null;
 }

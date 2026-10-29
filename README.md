@@ -186,7 +186,7 @@ O site tem um único visual claro. Ele declara um "tema escuro" que é a mesma p
 
 ## 💳 Pagamentos (Mercado Pago)
 
-O carrinho termina no **Checkout Pro** do Mercado Pago, na conta que os noivos conectam no painel com um clique:
+O convidado paga **dentro do site** (Checkout Transparente do Mercado Pago, com o *Payment Brick*), na conta que os noivos conectam no painel com um clique:
 
 ```mermaid
 sequenceDiagram
@@ -196,12 +196,13 @@ sequenceDiagram
     participant MP as Mercado Pago
     C->>S: escolhe presentes e clica em Pagar
     S->>A: POST /api/public/pedidos
-    A->>A: recalcula valores pelo banco e reserva
-    A->>MP: cria a preferência (token da conta conectada)
-    C->>MP: paga (Pix ou cartão em até 12x)
-    MP-->>A: webhook → API busca o pagamento no Mercado Pago
+    C->>S: preenche o cartão no formulário do Mercado Pago (iframe) ou escolhe Pix
+    S->>A: POST /api/public/pagamentos (token do cartão, nunca o número)
+    A->>A: recalcula o valor pelo banco e confere a disponibilidade
+    A->>MP: cria o pagamento (token da conta conectada)
+    MP-->>A: cartão aprovado/recusado na hora; Pix devolve o QR Code
+    MP-->>A: webhook quando o Pix é pago → API busca o pagamento
     A->>A: pedido pago, recibo por e-mail
-    C->>S: volta em /?pedido=… e vê o agradecimento
 ```
 
 - **Tudo pelo painel**, sem variáveis de ambiente nem secrets: em *Configurações*, o usuário master cadastra uma vez a aplicação do Mercado Pago (Client ID e Client Secret, conferidos com o Mercado Pago antes de salvar) e clica em **Conectar ao Mercado Pago**: entra no Mercado Pago, autoriza o site e volta (OAuth com PKCE).
@@ -209,7 +210,9 @@ sequenceDiagram
 - **O navegador nunca define preço**: a API recalcula tudo pelo banco.
 - **Taxa embutida**: cada presente é cadastrado com o valor que os noivos querem receber; o site cobra esse valor **mais 5,99% + R$ 0,39** (acima da taxa de cartão do Mercado Pago, 4,98%; Pix 0,99%; ajustável em Configurações). O preço é calculado de trás para frente, `(valor + fixo) / (1 − percentual)`, para sobrar exatamente o valor cadastrado. Regra única em `packages/shared/src/taxas.ts`, usada no site e na API.
 - **Parcelamento**: até 12x no cartão. Os juros ficam com o convidado, a não ser que a conta ofereça parcelas sem juros nas configurações do Mercado Pago.
-- **Presente único ou cota**: "Pode ser presenteado" 1 vez, quantas vezes quiserem (ex.: lua de mel) ou uma quantidade definida. A unidade fica reservada enquanto alguém paga (30 min; um Pix gerado vale 60 min) e a API trava a disponibilidade numa transação, então dois convidados não pagam o mesmo presente.
+- **Presente único ou cota**: "Pode ser presenteado" 1 vez, quantas vezes quiserem (ex.: lua de mel) ou uma quantidade definida. Só sai da lista o que foi pago. Enquanto alguém está pagando (um Pix gerado esperando o banco, ou os segundos em que o cartão é processado), o presente continua na lista, mas um segundo convidado que tentar pagar a mesma unidade recebe um erro. A API confere isso numa transação, com as linhas travadas.
+- **Segurança**: os dados do cartão ficam no formulário do Mercado Pago (iframe) e o site recebe só um token de uso único; o valor é sempre o do banco; cada pedido é a chave de idempotência do pagamento (não cobra duas vezes); o identificador do dispositivo (`security.js`) vai para o antifraude do Mercado Pago; cartão recusado é respondido na hora (`binary_mode`); limite de 15 tentativas por IP e de 5 cartões recusados por IP ou e-mail por hora (contra teste de cartões roubados); o CPF é conferido e só repassado ao Mercado Pago, nunca guardado nem registrado em log.
+- **Pix**: o QR Code aparece no site, fica guardado no pedido enquanto espera (o convidado vê de novo se recarregar) e vence em 30 minutos.
 - **Webhook** em `/api/mercadopago/webhook`, informado em cada pagamento (`notification_url`), então não há nada a configurar na aplicação. A notificação só diz "o pagamento X mudou"; a API sempre busca o pagamento no Mercado Pago com o token da conta, nunca confia no corpo.
 - **Taxa real**: cada pedido pago guarda a forma de pagamento e a taxa cobrada (`fee_details`). Estorno ou contestação deixa o pedido "estornado" e libera os presentes. Os pedidos antigos, pagos pelo Stripe, continuam no histórico.
 
@@ -222,7 +225,7 @@ sequenceDiagram
 4. Em **Credenciais de produção**, copie o **Client ID** e o **Client Secret** para o painel e salve.
 5. Clique em **Conectar ao Mercado Pago** com a conta que vai receber.
 
-**Teste:** em *Contas de teste*, crie um vendedor e um comprador. Conecte o vendedor no painel (aparece "Conta de teste") e pague logado com o comprador, usando os [cartões de teste](https://www.mercadopago.com.br/developers/pt/docs/checkout-pro/additional-content/your-integrations/test/cards) (titular `APRO` aprova, `OTHE` recusa). Em desenvolvimento, o redirecionamento do OAuth e o webhook precisam de uma URL pública (`SITE_URL`); a tela de volta consulta o pagamento direto no Mercado Pago.
+**Teste:** em *Contas de teste*, crie um vendedor de teste e conecte-o no painel (aparece "Conta de teste"). No site, pague com os [cartões de teste](https://www.mercadopago.com.br/developers/pt/docs/checkout-api-payments/integration-test/test-cards) (titular `APRO` aprova, `OTHE` recusa). Em desenvolvimento, o redirecionamento do OAuth e o webhook precisam de uma URL pública (`SITE_URL`); a tela do pedido consulta o pagamento direto no Mercado Pago.
 
 </details>
 
@@ -348,7 +351,7 @@ Em *Settings → Secrets and variables → Actions*. A cada deploy o job manda o
 | `GET /api/public/convites/:codigo` · `PUT …/resposta` | público | RSVP pelo código do convite |
 | `GET /api/public/checkin/:codigo` | público | validação na portaria |
 | `GET/POST /api/public/recados` | público | mural (POST limitado a 5/hora por IP) |
-| `GET /api/public/presentes` · `POST /api/public/pedidos` | público | lista e compra de presentes |
+| `GET /api/public/presentes` · `GET /api/public/pagamento` · `POST /api/public/pagamentos` | público | lista, chave pública do formulário e pagamento dos presentes |
 | `GET /api/public/galeria` | público | fotos do álbum |
 | `POST /api/mercadopago/webhook` | Mercado Pago | confirmação de pagamentos |
 | `POST /api/auth/login` · `logout` · `GET me` | — | sessão do painel |

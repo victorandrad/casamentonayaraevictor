@@ -6,7 +6,7 @@ import { iconeDaCategoria } from '@nv/shared/categorias';
 import type { ListaPresentes, Presente } from '@nv/shared/types';
 import { useCarrinho } from './carrinho';
 import { Checkout } from './Checkout';
-import { cancelarPagamentoPendente, lerRetornoDoPagamento, limparRetornoDaUrl } from './pagamento';
+import { pedidoEmAberto } from './pagamento';
 import { RetornoPagamento } from './RetornoPagamento';
 import { Paginacao, POR_PAGINA, gravarFiltroNaUrl, lerFiltroDaUrl, type Filtro } from './Paginacao';
 import './presentes.css';
@@ -87,20 +87,15 @@ export default function Presentes() {
   const [erro, setErro] = useState('');
   const [checkoutAberto, setCheckoutAberto] = useState(false);
   const [recemAdicionado, setRecemAdicionado] = useState<string | null>(null);
-  const [retorno] = useState(lerRetornoDoPagamento);
-  const [retornoAberto, setRetornoAberto] = useState(retorno?.tipo === 'sucesso');
-  const [avisoCancelado, setAvisoCancelado] = useState(retorno?.tipo === 'cancelado');
+  // The order whose screen is open: a payment just made (`novo`), or one still open from an earlier
+  // visit (a Pix waiting), which must not touch the cart the guest may have filled since.
+  const [pedidoAberto, setPedidoAberto] = useState<{ uid: string; novo: boolean } | null>(() => {
+    const uid = pedidoEmAberto();
+    return uid ? { uid, novo: false } : null;
+  });
   const [filtro, setFiltro] = useState<Filtro>(lerFiltroDaUrl);
   const topoDaLista = useRef<HTMLDivElement>(null);
   const carrinho = useCarrinho();
-
-  // Coming back from Mercado Pago: drop ?pedido (and its parameters) from the URL so a reload doesn't repeat it.
-  useEffect(() => {
-    if (retorno) limparRetornoDaUrl();
-    if (retorno?.tipo !== 'cancelado') return;
-    const timer = setTimeout(() => setAvisoCancelado(false), 10000);
-    return () => clearTimeout(timer);
-  }, []);
 
   const carregarLista = useCallback(async () => {
     try {
@@ -119,20 +114,8 @@ export default function Presentes() {
   }, []);
 
   useEffect(() => {
-    // A checkout left unpaid (cancelled or abandoned) still reserves its gifts:
-    // release it first so the list shows them as available again.
-    cancelarPagamentoPendente(retorno?.tipo === 'sucesso' ? retorno.pedido : undefined).finally(carregarLista);
-
-    // Back button from Mercado Pago restores this page from cache: same thing.
-    const onPageShow = (e: PageTransitionEvent) => {
-      if (!e.persisted) return;
-      cancelarPagamentoPendente().then((cancelou) => {
-        if (cancelou) carregarLista();
-      });
-    };
-    window.addEventListener('pageshow', onPageShow);
-    return () => window.removeEventListener('pageshow', onPageShow);
-  }, []);
+    carregarLista();
+  }, [carregarLista]);
 
   const adicionar = (presente: Presente) => {
     carrinho.dispatch({ tipo: 'adicionar', presente });
@@ -239,47 +222,19 @@ export default function Presentes() {
         <Paginacao pagina={pagina} totalPaginas={totalPaginas} total={filtrados.length} onPagina={irParaPagina} />
       </div>
 
-      {/* Back from the payment page without paying: a small note pinned above the cart, pointing at it. */}
-      {avisoCancelado && (
-        <div
-          className={carrinho.quantidade > 0 && !checkoutAberto ? 'presentes-aviso presentes-aviso--carrinho' : 'presentes-aviso'}
-          role="status"
-        >
-          <span className="presentes-aviso__icone" aria-hidden>
-            <Icon name="heart" size={18} />
-          </span>
-          <span className="presentes-aviso__texto">
-            <strong>Pagamento não concluído</strong>
-            <span>
-              Nada foi cobrado.{carrinho.quantidade > 0 ? ' Seus presentes continuam guardados no carrinho.' : ''}
-            </span>
-            {carrinho.quantidade > 0 && (
-              <button
-                className="presentes-aviso__acao"
-                onClick={() => {
-                  setAvisoCancelado(false);
-                  setCheckoutAberto(true);
-                }}
-              >
-                Tentar de novo →
-              </button>
-            )}
-          </span>
-          <button className="presentes-aviso__fechar" onClick={() => setAvisoCancelado(false)} aria-label="Fechar aviso">
-            ×
-          </button>
-        </div>
-      )}
-
-      {retorno?.tipo === 'sucesso' && retornoAberto && (
+      {pedidoAberto && (
         <RetornoPagamento
-          uid={retorno.pedido}
-          onConcluido={() => carrinho.dispatch({ tipo: 'limpar' })}
-          onFechar={() => setRetornoAberto(false)}
+          uid={pedidoAberto.uid}
+          onConcluido={() => pedidoAberto.novo && carrinho.dispatch({ tipo: 'limpar' })}
+          onFechar={() => {
+            setPedidoAberto(null);
+            // The list changed (a gift was paid or is being paid): show it as it is now.
+            carregarLista();
+          }}
         />
       )}
 
-      {carrinho.quantidade > 0 && !checkoutAberto && !retornoAberto && (
+      {carrinho.quantidade > 0 && !checkoutAberto && !pedidoAberto && (
         <button
           key={carrinho.quantidade}
           className="presentes-cart-fab"
@@ -305,6 +260,10 @@ export default function Presentes() {
           onQuantidade={(id, quantidade) => carrinho.dispatch({ tipo: 'quantidade', id, quantidade })}
           onRemover={(id) => carrinho.dispatch({ tipo: 'remover', id })}
           onFechar={() => setCheckoutAberto(false)}
+          onConcluido={(pedido) => {
+            setCheckoutAberto(false);
+            setPedidoAberto({ uid: pedido, novo: true });
+          }}
         />
       )}
     </section>

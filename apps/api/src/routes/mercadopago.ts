@@ -23,8 +23,12 @@ export async function mercadoPagoWebhookRoutes(app: FastifyInstance) {
           await aplicarPagamentoMercadoPago(pagamento);
           req.log.info({ pagamento: dataId, status: pagamento.status }, 'pedido atualizado pelo Mercado Pago');
         } catch (error) {
-          // No account connected (it was disconnected in the panel): nothing to update.
-          if (error instanceof ContaNaoConectada) return { recebido: true };
+          // No account connected, or its authorization stopped working: answer with an error so
+          // Mercado Pago retries later (once the account is connected again, the notice goes through).
+          if (error instanceof ContaNaoConectada) {
+            req.log.warn('webhook do Mercado Pago sem conta conectada válida');
+            return reply.code(503).send({ erro: 'Pagamentos indisponíveis no momento.' });
+          }
           // A 5xx makes Mercado Pago retry the notification later.
           req.log.error(error, 'falha ao consultar o pagamento no Mercado Pago');
           return reply.code(502).send({ erro: 'Falha ao consultar o pagamento.' });

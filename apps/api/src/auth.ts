@@ -107,6 +107,11 @@ export function rateLimiter(max: number, windowMs: number) {
       entry.count += 1;
       return entry.count > max;
     },
+    // Whether the key is already over the limit, without counting this call.
+    excedido(key: string): boolean {
+      const entry = hits.get(key);
+      return !!entry && entry.resetAt >= Date.now() && entry.count >= max;
+    },
     reset(key: string) {
       hits.delete(key);
     },

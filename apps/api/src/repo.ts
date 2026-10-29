@@ -309,9 +309,10 @@ export async function categoriaExiste(id: number): Promise<boolean> {
 
 // ---- Presentes ----
 
-// How long an unpaid checkout keeps its gifts reserved. Mercado Pago preferences are
-// created to expire after 30 minutes; a little slack covers clock differences.
-export const RESERVA_MINUTOS = 35;
+// How long an order still waiting for Mercado Pago's answer counts as "being paid". An order is only
+// "pendente" during the payment request itself (seconds); it stays so only if that request timed
+// out, until the webhook settles it.
+export const RESERVA_MINUTOS = 5;
 
 // `id` is the internal key (joins with pedido_itens); `uid` is the only identifier that leaves the
 // database — the site, the panel and the API know a gift by it (see migration 012).
@@ -324,21 +325,26 @@ type PresenteRow = {
   foto_url: string | null;
   quantidade_maxima: number | null;
   presenteados: string;
-  reservados: string;
+  em_pagamento: string;
 };
 
-// Paid units, plus units in checkouts that can still be paid (reserved).
+// Paid units (the only ones that leave the list), and units being paid right now: a payment
+// request in flight or a Pix waiting for the bank. Those don't leave the list, but a second
+// guest can't start paying for them at the same time (see pagar in pedidos.ts).
 export const PRESENTE_SELECT = `
   SELECT p.id, p.uid, p.categoria_id, p.nome, p.valor_centavos, p.foto_url, p.quantidade_maxima,
-         coalesce(v.presenteados, 0) AS presenteados, coalesce(v.reservados, 0) AS reservados
+         coalesce(v.presenteados, 0) AS presenteados, coalesce(v.em_pagamento, 0) AS em_pagamento
     FROM presentes p
     LEFT JOIN (
       SELECT i.presente_id,
              sum(i.quantidade) FILTER (WHERE pe.status = 'pago') AS presenteados,
              sum(i.quantidade) FILTER (
-               WHERE pe.status = 'aguardando'
+               -- A Pix holds only until it expires (plus slack), even if the "expired" notice never
+               -- comes; other waiting payments (e.g. old Checkout Pro ones) for at most 90 minutes.
+               WHERE (pe.status = 'aguardando'
+                      AND coalesce(pe.pix_expira_em, pe.criado_em + interval '90 minutes') > now() - interval '${RESERVA_MINUTOS} minutes')
                   OR (pe.status = 'pendente' AND pe.criado_em > now() - interval '${RESERVA_MINUTOS} minutes')
-             ) AS reservados
+             ) AS em_pagamento
         FROM pedido_itens i
         JOIN pedidos pe ON pe.id = i.pedido_id
        GROUP BY i.presente_id
@@ -346,7 +352,6 @@ export const PRESENTE_SELECT = `
 
 export const toPresente = (r: PresenteRow): Presente => {
   const presenteados = Number(r.presenteados);
-  const reservados = Number(r.reservados);
   return {
     id: r.uid,
     categoriaId: r.categoria_id,
@@ -354,8 +359,9 @@ export const toPresente = (r: PresenteRow): Presente => {
     valorCentavos: r.valor_centavos,
     fotoUrl: r.foto_url,
     quantidadeMaxima: r.quantidade_maxima,
-    disponivel: r.quantidade_maxima === null ? null : Math.max(0, r.quantidade_maxima - presenteados - reservados),
+    disponivel: r.quantidade_maxima === null ? null : Math.max(0, r.quantidade_maxima - presenteados),
     presenteados,
+    emPagamento: Number(r.em_pagamento),
   };
 };
 

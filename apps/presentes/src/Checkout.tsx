@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Icon } from '@nv/shared';
 import { errorMessage, formatBRL } from '@nv/shared/api';
+import type { PedidoInput } from '@nv/shared/types';
 import { MAX_QUANTIDADE, type ItemCarrinho } from './carrinho';
-import { criarPagamento, type Convidado } from './pagamento';
+import { configPagamento, lembrarPedidoAberto, pagar, type Convidado } from './pagamento';
+import { PagamentoBrick } from './PagamentoBrick';
 
-type Etapa = 'carrinho' | 'dados' | 'revisao';
+type Etapa = 'carrinho' | 'dados' | 'pagamento';
 const etapas: Array<[Etapa, string]> = [
   ['carrinho', 'Presentes'],
   ['dados', 'Seus dados'],
-  ['revisao', 'Revisão'],
+  ['pagamento', 'Pagamento'],
 ];
 
 type Props = {
@@ -17,21 +19,27 @@ type Props = {
   onQuantidade: (id: string, quantidade: number) => void;
   onRemover: (id: string) => void;
   onFechar: () => void;
+  // The payment went through (card approved) or a Pix is waiting: show the order's screen.
+  onConcluido: (pedido: string) => void;
 };
 
 const emailValido = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
-// Keep the "going to a secure page" screen up long enough to be read.
-const TEMPO_MINIMO_AVISO = 1800;
-const esperar = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const soDigitos = (texto: string) => texto.replace(/\D/g, '');
+const formatarCpf = (texto: string) =>
+  soDigitos(texto)
+    .slice(0, 11)
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
 
-// Gift checkout: review the cart, tell us who is giving, check the order, then
-// `criarPagamento` creates the order on the API and we redirect to Mercado Pago's payment page.
-export function Checkout({ itens, total, onQuantidade, onRemover, onFechar }: Props) {
+// Gift checkout: review the cart, tell us who is giving, then pay right here with Mercado Pago's
+// Payment Brick (card or Pix). The order is created only when the guest presses "Pagar".
+export function Checkout({ itens, total, onQuantidade, onRemover, onFechar, onConcluido }: Props) {
   const [etapa, setEtapa] = useState<Etapa>('carrinho');
-  const [convidado, setConvidado] = useState<Convidado>({ nome: '', email: '', mensagem: '' });
+  const [convidado, setConvidado] = useState<Convidado>({ nome: '', email: '', mensagem: '', cpf: '' });
   const [erroDados, setErroDados] = useState('');
   const [aviso, setAviso] = useState('');
-  const [enviando, setEnviando] = useState(false);
+  const [publicKey, setPublicKey] = useState<string | null>(null);
   const painel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,13 +59,13 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar }: Pr
     painel.current?.scrollTo({ top: 0 });
   }, [etapa]);
 
-  // Coming back from Mercado Pago with the browser's back button restores this page
-  // from cache; drop the redirect screen so the guest can try again.
+  // The payment step needs the connected account's public key for the Brick.
   useEffect(() => {
-    const onPageShow = (e: PageTransitionEvent) => e.persisted && setEnviando(false);
-    window.addEventListener('pageshow', onPageShow);
-    return () => window.removeEventListener('pageshow', onPageShow);
-  }, []);
+    if (etapa !== 'pagamento' || publicKey) return;
+    configPagamento()
+      .then((c) => (c.publicKey ? setPublicKey(c.publicKey) : setAviso('O pagamento online ainda não está disponível. Tente mais tarde.')))
+      .catch((error) => setAviso(errorMessage(error)));
+  }, [etapa, publicKey]);
 
   // An emptied cart can't move forward.
   useEffect(() => {
@@ -68,28 +76,36 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar }: Pr
     e.preventDefault();
     if (!convidado.nome.trim()) return setErroDados('Informe seu nome.');
     if (!emailValido(convidado.email)) return setErroDados('Informe um e-mail válido para receber o comprovante.');
+    if (soDigitos(convidado.cpf).length !== 11) return setErroDados('Informe seu CPF: o Mercado Pago pede para qualquer pagamento.');
     setErroDados('');
-    setEtapa('revisao');
+    setAviso('');
+    setEtapa('pagamento');
   };
 
-  const pagar = async () => {
-    setEnviando(true);
+  const dadosDoConvidado = (): Convidado => ({
+    nome: convidado.nome.trim(),
+    email: convidado.email.trim(),
+    mensagem: convidado.mensagem.trim(),
+    cpf: soDigitos(convidado.cpf),
+  });
+
+  // Called by the Brick. Throwing keeps the guest on the form to try again.
+  const pagarCom = async (pagamento: PedidoInput['pagamento']) => {
     setAviso('');
+    let resultado;
     try {
-      const [url] = await Promise.all([
-        criarPagamento({
-          itens,
-          totalCentavos: total,
-          convidado: { nome: convidado.nome.trim(), email: convidado.email.trim(), mensagem: convidado.mensagem.trim() },
-        }),
-        esperar(TEMPO_MINIMO_AVISO),
-      ]);
-      // The browser leaves for Mercado Pago, so the redirect screen stays up.
-      window.location.assign(url);
+      resultado = await pagar(itens, total, dadosDoConvidado(), pagamento);
     } catch (error) {
       setAviso(errorMessage(error));
-      setEnviando(false);
+      throw error;
     }
+    if (resultado.status === 'falhou') {
+      setAviso(resultado.motivo ?? 'O pagamento foi recusado e nada foi cobrado. Tente de novo.');
+      throw new Error(resultado.motivo);
+    }
+    // A Pix waiting, or a payment Mercado Pago didn't confirm yet: keep it to show again after a reload.
+    if (resultado.status === 'aguardando' || resultado.status === 'pendente') lembrarPedidoAberto(resultado.pedido);
+    onConcluido(resultado.pedido);
   };
 
   const atual = etapas.findIndex(([id]) => id === etapa);
@@ -105,27 +121,6 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar }: Pr
         aria-label="Finalizar presente"
         onClick={(e) => e.stopPropagation()}
       >
-        {enviando && (
-          <div className="checkout__redirect" role="status" aria-live="assertive">
-            <span className="checkout__redirect-icon">
-              <Icon name="shield" size={40} />
-            </span>
-            <h2 className="checkout__redirect-title">Indo para o ambiente seguro</h2>
-            <p className="checkout__redirect-text">
-              Estamos levando você para a página de pagamento do Mercado Pago. Lá, seus dados são criptografados e protegidos;
-              o site do casamento não tem acesso aos dados do seu cartão ou do seu Pix.
-            </p>
-            <span className="checkout__redirect-dots" aria-hidden>
-              <i />
-              <i />
-              <i />
-            </span>
-            <p className="checkout__redirect-seal">
-              <Icon name="lock" size={14} /> Conexão segura · Mercado Pago, certificado PCI DSS nível 1
-            </p>
-          </div>
-        )}
-
         <header className="checkout__header">
           <ol className="checkout__steps" aria-label="Etapas">
             {etapas.map(([id, label], i) => (
@@ -237,6 +232,20 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar }: Pr
               onChange={(e) => set('email', e.target.value)}
             />
 
+            <label className="nv-label" htmlFor="checkout-cpf">
+              CPF
+            </label>
+            <input
+              id="checkout-cpf"
+              className="nv-input"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="000.000.000-00"
+              value={convidado.cpf}
+              onChange={(e) => set('cpf', formatarCpf(e.target.value))}
+            />
+            <p className="checkout__hint checkout__hint--campo">Pedido pelo Mercado Pago para a segurança do pagamento. Não fica guardado no site.</p>
+
             <label className="nv-label" htmlFor="checkout-msg">
               Mensagem para os noivos (opcional)
             </label>
@@ -256,7 +265,7 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar }: Pr
               </p>
             )}
             <button type="submit" className="nv-btn nv-btn--block">
-              Revisar pedido
+              Ir para o pagamento
             </button>
             <button type="button" className="checkout__link" onClick={() => setEtapa('carrinho')}>
               ← Voltar aos presentes
@@ -264,10 +273,10 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar }: Pr
           </form>
         )}
 
-        {etapa === 'revisao' && (
+        {etapa === 'pagamento' && (
           <section className="checkout__body nv-fade-up">
             <h2 className="checkout__title" tabIndex={-1}>
-              Revise seu presente
+              Pagamento
             </h2>
 
             <ul className="checkout__summary">
@@ -304,27 +313,33 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar }: Pr
               </button>
             </div>
 
-            {aviso && (
-              <p className="checkout__alert" role="alert">
-                {aviso}
-              </p>
-            )}
             <div className="checkout__seguranca">
               <span className="checkout__seguranca-icon">
                 <Icon name="lock" size={22} />
               </span>
               <div>
-                <strong>Pagamento em ambiente seguro</strong>
+                <strong>Pagamento seguro pelo Mercado Pago</strong>
                 <p>
-                  Ao continuar, você será redirecionado para a página de pagamento do <b>Mercado Pago</b>, onde pode pagar
-                  com Pix ou cartão em até 12x. Seus dados de pagamento ficam protegidos com criptografia e não passam pelo nosso
-                  site nem ficam guardados conosco.
+                  Pague com Pix ou cartão em até 12x sem sair do site. O formulário abaixo é do <b>Mercado Pago</b>: os dados
+                  do cartão vão direto para ele, criptografados, e não passam pelo nosso site nem ficam guardados conosco.
                 </p>
               </div>
             </div>
-            <button className="nv-btn nv-btn--block" onClick={pagar} disabled={enviando}>
-              <Icon name="lock" size={16} /> {`Pagar ${formatBRL(total)} com segurança`}
-            </button>
+
+            {aviso && (
+              <p className="checkout__alert" role="alert">
+                {aviso}
+              </p>
+            )}
+            {publicKey && (
+              <PagamentoBrick
+                publicKey={publicKey}
+                totalCentavos={total}
+                email={convidado.email.trim()}
+                cpf={soDigitos(convidado.cpf)}
+                onPagar={pagarCom}
+              />
+            )}
             <button className="checkout__link" onClick={() => setEtapa('carrinho')}>
               ← Voltar aos presentes
             </button>

@@ -43,14 +43,14 @@ function situacao(p: Presente): { texto: string; classe: string } {
   if (p.quantidadeMaxima === null) {
     return { texto: `Cota · ${p.presenteados} contribuição(ões)`, classe: 'cota' };
   }
-  const reservado = p.quantidadeMaxima - p.presenteados - (p.disponivel ?? 0);
   if (p.quantidadeMaxima === 1) {
     if (p.presenteados >= 1) return { texto: 'Presenteado ♥', classe: 'presenteado' };
-    if (reservado > 0) return { texto: 'Em pagamento', classe: 'reservado' };
+    if (p.emPagamento > 0) return { texto: 'Em pagamento', classe: 'reservado' };
     return { texto: 'Único · disponível', classe: 'disponivel' };
   }
   if (p.disponivel === 0 && p.presenteados >= p.quantidadeMaxima) return { texto: `Esgotado · ${p.presenteados}/${p.quantidadeMaxima}`, classe: 'presenteado' };
-  return { texto: `${p.presenteados} de ${p.quantidadeMaxima} presenteados`, classe: p.disponivel === 0 ? 'reservado' : 'disponivel' };
+  const emPagamento = p.emPagamento > 0 ? ` · ${p.emPagamento} em pagamento` : '';
+  return { texto: `${p.presenteados} de ${p.quantidadeMaxima} presenteados${emPagamento}`, classe: p.emPagamento > 0 ? 'reservado' : 'disponivel' };
 }
 
 const centavosDoRascunho = (r: Rascunho) => {

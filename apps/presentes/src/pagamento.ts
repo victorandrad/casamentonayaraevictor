@@ -1,85 +1,142 @@
 import { api } from '@nv/shared/api';
-import type { PedidoCriado, PedidoInput, PedidoPublico } from '@nv/shared/types';
+import type { PagamentoResultado, PedidoInput, PedidoPublico } from '@nv/shared/types';
 import type { ItemCarrinho } from './carrinho';
 
-export type Convidado = { nome: string; email: string; mensagem: string };
-export type Pedido = { itens: ItemCarrinho[]; totalCentavos: number; convidado: Convidado };
+export type Convidado = { nome: string; email: string; mensagem: string; cpf: string };
 
-// Creates the order on the API (prices are recalculated there) and returns the
-// URL of Mercado Pago's payment page (Checkout Pro) for the guest to pay.
-export async function criarPagamento(pedido: Pedido): Promise<string> {
-  const body: PedidoInput = {
-    itens: pedido.itens.map((i) => ({ presenteId: i.id, quantidade: i.quantidade })),
-    convidado: pedido.convidado,
+// ---- Mercado Pago's scripts ----
+
+// The SDK draws the payment form (Payment Brick) in Mercado Pago's own iframe, so card data never
+// touches the site; security.js sets the device id their anti-fraud uses. Both load only when the
+// guest reaches the payment step.
+const SDK = 'https://sdk.mercadopago.com/js/v2';
+const SEGURANCA = 'https://www.mercadopago.com/v2/security.js';
+
+type FormDataBrick = {
+  token?: string;
+  issuer_id?: string | number | null;
+  payment_method_id?: string;
+  installments?: number;
+};
+export type ControladorBrick = { unmount: () => void };
+type MercadoPagoSdk = new (
+  publicKey: string,
+  opcoes: { locale: string },
+) => {
+  bricks: () => {
+    create: (tipo: 'payment', container: string, settings: unknown) => Promise<ControladorBrick>;
   };
-  const criado = await api<PedidoCriado>('/public/pedidos', { method: 'POST', body });
-  try {
-    sessionStorage.setItem(PEDIDO_PENDENTE, criado.pedido);
-  } catch {
-    // storage blocked: the reservation simply times out on its own
+};
+
+declare global {
+  interface Window {
+    MercadoPago?: MercadoPagoSdk;
+    MP_DEVICE_SESSION_ID?: string;
   }
-  return criado.url;
 }
 
-// Only the order's UUID is kept in the browser (never Mercado Pago's ids).
-const PEDIDO_PENDENTE = 'nv_pedido_pendente';
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const carregados = new Map<string, Promise<void>>();
 
-// The guest came back without paying (cancelled, or the browser's back button):
-// release the gifts that checkout reserved. `exceto` is an order that was paid.
-//
-// The list must only load after the release has finished: until then the guest's own reservation
-// makes a unique gift look taken, and syncing the cart would drop it. A call made while one is
-// still running (React runs effects twice in development) waits for that same release instead of
-// finding nothing to cancel and loading the list too early.
-let liberando: Promise<boolean> | null = null;
-
-export function cancelarPagamentoPendente(exceto?: string): Promise<boolean> {
-  if (liberando) return liberando;
-  let pedido: string | null;
-  try {
-    pedido = sessionStorage.getItem(PEDIDO_PENDENTE);
-    sessionStorage.removeItem(PEDIDO_PENDENTE);
-  } catch {
-    return Promise.resolve(false);
-  }
-  if (!pedido || !UUID.test(pedido) || pedido === exceto) return Promise.resolve(false);
-  liberando = api(`/public/pedidos/${pedido}/cancelar`, { method: 'POST' })
-    .then(() => true)
-    .catch(() => true)
-    .finally(() => {
-      liberando = null;
+function carregarScript(src: string, atributos: Record<string, string> = {}): Promise<void> {
+  let carregando = carregados.get(src);
+  if (!carregando) {
+    carregando = new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      for (const [nome, valor] of Object.entries(atributos)) script.setAttribute(nome, valor);
+      script.onload = () => resolve();
+      script.onerror = () => {
+        carregados.delete(src);
+        script.remove();
+        reject(new Error('Não foi possível carregar o pagamento seguro. Verifique sua conexão e tente de novo.'));
+      };
+      document.head.appendChild(script);
     });
-  return liberando;
+    carregados.set(src, carregando);
+  }
+  return carregando;
+}
+
+export async function carregarMercadoPago(): Promise<MercadoPagoSdk> {
+  // The device id is a best-effort extra: a blocked security.js must not stop the payment.
+  void carregarScript(SEGURANCA, { view: 'checkout' }).catch(() => {});
+  await carregarScript(SDK);
+  if (!window.MercadoPago) throw new Error('Não foi possível carregar o pagamento seguro. Tente de novo.');
+  return window.MercadoPago;
+}
+
+export const dispositivo = () => {
+  const id = window.MP_DEVICE_SESSION_ID;
+  return id && /^[A-Za-z0-9:_-]{1,200}$/.test(id) ? id : undefined;
+};
+
+// ---- API ----
+
+export const configPagamento = () => api<{ disponivel: boolean; publicKey: string | null }>('/public/pagamento');
+
+// What the Payment Brick hands over becomes either a card token or the Pix choice. The amount it
+// carries is ignored: the API charges the price from the database.
+export function dadosDoBrick(formData: FormDataBrick): PedidoInput['pagamento'] {
+  if (formData.payment_method_id === 'pix') return { metodo: 'pix' };
+  if (!formData.token || !formData.payment_method_id || !formData.installments) {
+    throw new Error('Não foi possível ler os dados do cartão. Confira e tente de novo.');
+  }
+  return {
+    metodo: 'cartao',
+    token: formData.token,
+    paymentMethodId: formData.payment_method_id,
+    issuerId: formData.issuer_id ? String(formData.issuer_id) : null,
+    parcelas: formData.installments,
+  };
+}
+
+export function pagar(
+  itens: ItemCarrinho[],
+  totalCentavos: number,
+  convidado: Convidado,
+  pagamento: PedidoInput['pagamento'],
+): Promise<PagamentoResultado> {
+  const body: PedidoInput = {
+    itens: itens.map((i) => ({ presenteId: i.id, quantidade: i.quantidade })),
+    totalEsperadoCentavos: totalCentavos,
+    convidado,
+    pagamento,
+    dispositivo: dispositivo(),
+  };
+  return api<PagamentoResultado>('/public/pagamentos', { method: 'POST', body });
 }
 
 export const consultarPedido = (pedido: string) => api<PedidoPublico>(`/public/pedidos/${pedido}`);
 
-// Mercado Pago sends the guest back to /?pedido=<order UUID> (or =cancelado), adding its own
-// parameters about the payment, which the site doesn't use (the API asks Mercado Pago itself).
-const PARAMETROS_DO_MERCADO_PAGO = [
-  'collection_id',
-  'collection_status',
-  'payment_id',
-  'status',
-  'external_reference',
-  'payment_type',
-  'merchant_order_id',
-  'preference_id',
-  'site_id',
-  'processing_mode',
-  'merchant_account_id',
-];
+// ---- An order still open (a Pix waiting, or a payment being confirmed) ----
 
-export function lerRetornoDoPagamento(): { tipo: 'sucesso'; pedido: string } | { tipo: 'cancelado' } | null {
-  const valor = new URLSearchParams(location.search).get('pedido');
-  if (!valor) return null;
-  if (valor === 'cancelado') return { tipo: 'cancelado' };
-  return UUID.test(valor) ? { tipo: 'sucesso', pedido: valor } : null;
+// Only the order's UUID is kept in the browser (never Mercado Pago's ids), so a guest who reloads or
+// closes the tab gets it back on the next visit (the Pix code, or the confirmation) until it settles.
+const PIX_ABERTO = 'nv_pedido_aberto';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function lembrarPedidoAberto(pedido: string) {
+  try {
+    localStorage.setItem(PIX_ABERTO, pedido);
+  } catch {
+    // storage blocked: the order still works, it just isn't shown again after a reload
+  }
 }
 
-export function limparRetornoDaUrl() {
-  const url = new URL(location.href);
-  for (const nome of ['pedido', ...PARAMETROS_DO_MERCADO_PAGO]) url.searchParams.delete(nome);
-  history.replaceState(null, '', url.pathname + url.search + url.hash);
+export function pedidoEmAberto(): string | null {
+  try {
+    const pedido = localStorage.getItem(PIX_ABERTO);
+    return pedido && UUID.test(pedido) ? pedido : null;
+  } catch {
+    return null;
+  }
+}
+
+export function esquecerPedidoAberto() {
+  try {
+    localStorage.removeItem(PIX_ABERTO);
+  } catch {
+    // nothing to forget
+  }
 }

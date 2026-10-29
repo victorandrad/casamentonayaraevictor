@@ -39,10 +39,13 @@ export type Presente = {
   fotoUrl: string | null;
   // How many times it can be given: 1 = unique gift, N = limited, null = unlimited (cotas)
   quantidadeMaxima: number | null;
-  // Still available (paid and in-checkout units discounted); null when unlimited
+  // Still on the list (only paid units discounted); null when unlimited
   disponivel: number | null;
   // Units already paid
   presenteados: number;
+  // Units someone is paying for right now (open checkout or Pix waiting for the bank): they stay on
+  // the list, but nobody else can start paying for them until that checkout ends
+  emPagamento: number;
 };
 // `valorCentavos` of each gift is what the couple receives; guests pay it plus `taxa`.
 export type ListaPresentes = { categorias: Categoria[]; presentes: Presente[]; taxa: Taxa };
@@ -86,7 +89,7 @@ export type ConvidadoAdmin = {
 };
 export type ConvidadoInput = { nome: string; limiteAcompanhantes: number };
 export type RecadoAdmin = Recado & { visivel: boolean };
-export type PresenteInput = Omit<Presente, 'id' | 'disponivel' | 'presenteados'>;
+export type PresenteInput = Omit<Presente, 'id' | 'disponivel' | 'presenteados' | 'emPagamento'>;
 export type Configuracoes = { taxa: Taxa };
 export type AplicacaoMercadoPagoInput = { clientId: string; clientSecret: string };
 // The Mercado Pago account that receives the gifts, connected from the panel (OAuth).
@@ -103,18 +106,30 @@ export type ContaMercadoPago = {
     conectadaEm: string;
     conectadaPor: string | null;
     expiraEm: string; // authorization renewed automatically before this
+    precisaReconectar: boolean; // connected before the in-site checkout (no public key yet)
   } | null;
 };
 
 // Gift orders (Mercado Pago Checkout Pro; older ones went through Stripe)
 // 'estornado': refunded or charged back after being paid; the gifts are free again.
 export type StatusPedido = 'pendente' | 'aguardando' | 'pago' | 'falhou' | 'expirado' | 'estornado';
+// Paying inside the site (Checkout Transparente). `pagamento` comes from Mercado Pago's Payment Brick:
+// for a card, the one-time token it created (card data never reaches the site); never an amount,
+// which the API takes from the database. `dispositivo`: Mercado Pago's device id, for anti-fraud.
+// `cpf` is only passed on to Mercado Pago, never stored. `totalEsperadoCentavos`: the total the guest
+// saw; it is never the price, only compared, so a price changed meanwhile isn't charged silently.
 export type PedidoInput = {
   itens: Array<{ presenteId: string; quantidade: number }>;
-  convidado: { nome: string; email: string; mensagem: string };
+  totalEsperadoCentavos: number;
+  convidado: { nome: string; email: string; mensagem: string; cpf: string };
+  pagamento: { metodo: 'cartao'; token: string; paymentMethodId: string; issuerId: string | null; parcelas: number } | { metodo: 'pix' };
+  dispositivo?: string;
 };
-// `pedido`: the order's public UUID, the only order identifier the browser keeps.
-export type PedidoCriado = { url: string; pedido: string };
+// `pedido`: the order's public UUID, the only order identifier the browser keeps. `motivo`: why a
+// card was refused, in words for the guest.
+export type PagamentoResultado = { pedido: string; status: StatusPedido; motivo?: string };
+// A Pix waiting to be paid (shown again if the guest reloads the page).
+export type PixPendente = { codigo: string; qrBase64: string | null; expiraEm: string | null };
 export type ItemPedido = { nome: string; quantidade: number; valorCentavos: number };
 export type PedidoPublico = {
   status: StatusPedido;
@@ -122,8 +137,9 @@ export type PedidoPublico = {
   subtotalCentavos: number; // gifts only (what the couple receives)
   totalCentavos: number; // charged to the guest, fee included
   itens: ItemPedido[];
+  pix: PixPendente | null; // while a Pix waits to be paid
 };
-export type PedidoAdmin = PedidoPublico & {
+export type PedidoAdmin = Omit<PedidoPublico, 'pix'> & {
   id: string; // public identifier (UUID)
   numero: string; // short code shown to people (first part of the UUID)
   email: string;

@@ -74,8 +74,8 @@ export function AvisoCookies() {
               </label>
               <p className="shell-cookies__descricao">
                 O carrinho e o pagamento em andamento, a abertura do mapa já vista e o login do painel dos noivos.
-                Ficam só no seu navegador, sem rastreamento nem anúncios. O pagamento é feito nas páginas do Mercado Pago,
-                que usa cookies próprios para a segurança da compra.
+                Ficam só no seu navegador, sem rastreamento nem anúncios. Na hora de pagar, o
+                formulário do Mercado Pago é carregado no site e usa cookies próprios para a segurança da compra.
               </p>
             </div>
             <Interruptor id="cookies-essenciais" ligado bloqueado />
