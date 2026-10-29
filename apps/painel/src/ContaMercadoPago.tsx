@@ -394,6 +394,21 @@ export function ContaMercadoPago() {
         </>
       )}
 
+      {data?.ultimoErro && (
+        <details className="painel-mp__erro">
+          <summary>Último erro do Mercado Pago · {new Date(data.ultimoErro.quando).toLocaleString('pt-BR')}</summary>
+          <p>
+            {data.ultimoErro.status ? `HTTP ${data.ultimoErro.status}` : 'Sem chamada'} em <code>{data.ultimoErro.caminho}</code>
+            {data.ultimoErro.codigo && (
+              <>
+                {' '}· <code>{data.ultimoErro.codigo}</code>
+              </>
+            )}
+            {data.ultimoErro.mensagem && <> · {data.ultimoErro.mensagem}</>}
+          </p>
+        </details>
+      )}
+
       {desconectando && (
         <ConfirmarModal
           titulo="Desconectar o Mercado Pago"

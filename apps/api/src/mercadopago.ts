@@ -2,7 +2,7 @@
 // Pago's own form, in an iframe) turns the card into a one-time token; this module creates the
 // payment with it (or a Pix) in the account the couple connected (mercadopagoConta.ts). Card data
 // never reaches the site. The webhook and the order page bring later changes back (Pix paid, refund).
-import type { StatusPedido } from '@nv/shared/types';
+import type { ErroMercadoPago, StatusPedido } from '@nv/shared/types';
 import { config } from './config.ts';
 import { query, queryOne } from './db.ts';
 import { tokenDeAcesso } from './mercadopagoConta.ts';
@@ -15,6 +15,11 @@ export const PIX_MINUTOS = 30;
 export const PARCELAS = 12;
 
 export class ContaNaoConectada extends Error {}
+
+// The last error Mercado Pago answered with, shown to the couple in the panel to diagnose a setup
+// problem (e.g. an Access Token Mercado Pago refuses). In memory only; never shown to guests.
+let ultimoErro: ErroMercadoPago | null = null;
+export const ultimoErroMercadoPago = () => ultimoErro;
 // Mercado Pago answered with an error (4xx): the request itself was refused (e.g. invalid card token).
 export class PagamentoRecusadoPeloMercadoPago extends Error {}
 
@@ -23,7 +28,10 @@ async function mp<T>(
   init: { method?: string; body?: unknown; idempotencia?: string; dispositivo?: string } = {},
 ): Promise<T> {
   const token = await tokenDeAcesso();
-  if (!token) throw new ContaNaoConectada('Nenhuma conta do Mercado Pago conectada.');
+  if (!token) {
+    ultimoErro = { quando: new Date().toISOString(), status: null, caminho, codigo: null, mensagem: 'Sem Access Token utilizável (conta não conectada ou token ilegível).' };
+    throw new ContaNaoConectada('Nenhuma conta do Mercado Pago conectada.');
+  }
   const resposta = await fetch(`${API}${caminho}`, {
     method: init.method ?? 'GET',
     headers: {
@@ -40,6 +48,13 @@ async function mp<T>(
     // Only the status and Mercado Pago's error code are logged: the body may echo payer data.
     const detalhe = (await resposta.json().catch(() => null)) as { error?: string; message?: string } | null;
     const erro = `Mercado Pago ${resposta.status} em ${caminho.split('?')[0]}: ${detalhe?.error ?? ''}`;
+    ultimoErro = {
+      quando: new Date().toISOString(),
+      status: resposta.status,
+      caminho: caminho.split('?')[0],
+      codigo: detalhe?.error ?? null,
+      mensagem: detalhe?.message?.slice(0, 200) ?? null,
+    };
     // The account's authorization no longer works (revoked on Mercado Pago, or expired): not the
     // guest's fault, so it is "payments unavailable", not a refused card.
     if (resposta.status === 401) throw new ContaNaoConectada(erro);

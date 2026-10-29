@@ -97,8 +97,11 @@ export type CredenciaisMercadoPagoInput = { publicKey: string; accessToken: stri
 // The Mercado Pago account that receives the gifts, connected from the panel (OAuth).
 // `aplicacao`: the Mercado Pago application registered in the panel (its secret never comes back);
 // `urlDeRetorno`: the redirect URL to register in that application.
+// The last error Mercado Pago answered with (panel only, to diagnose the setup).
+export type ErroMercadoPago = { quando: string; status: number | null; caminho: string; codigo: string | null; mensagem: string | null };
 export type ContaMercadoPago = {
   urlDeRetorno: string;
+  ultimoErro?: ErroMercadoPago | null;
   aplicacao: { clientId: string } | null;
   conta: {
     usuarioId: string;

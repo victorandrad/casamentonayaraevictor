@@ -6,6 +6,7 @@ import { destroyOtherSessions, requireAuth, requireOwner, SESSION_COOKIE } from 
 import * as repo from '../repo.ts';
 import { enviarReciboDoPedido, listarPedidos } from '../pedidos.ts';
 import * as mercadoPagoConta from '../mercadopagoConta.ts';
+import { ultimoErroMercadoPago } from '../mercadopago.ts';
 import { ImagemInvalida, LADO_GALERIA, LADO_PRESENTE, removerImagem, salvarImagem, TIPOS_ACEITOS } from '../uploads.ts';
 import * as usuarios from '../usuarios.ts';
 
@@ -459,7 +460,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
   // Mercado Pago: "Conectar ao Mercado Pago" sends the couple to authorize the application, and
   // Mercado Pago brings them back to /retorno, which goes on to the panel with the result.
-  app.get('/mercadopago', async () => mercadoPagoConta.situacao());
+  app.get('/mercadopago', async () => ({ ...(await mercadoPagoConta.situacao()), ultimoErro: ultimoErroMercadoPago() }));
 
   app.put<{ Body: AplicacaoMercadoPagoInput }>(
     '/mercadopago/aplicacao',

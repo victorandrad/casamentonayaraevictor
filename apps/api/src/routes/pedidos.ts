@@ -137,6 +137,7 @@ export async function pedidosRoutes(app: FastifyInstance) {
       } catch (error) {
         if (error instanceof PedidoInvalido) return reply.code(400).send({ erro: error.message });
         if (error instanceof ContaNaoConectada) {
+          req.log.warn({ err: error.message }, 'Mercado Pago recusou o Access Token da conta');
           return reply.code(503).send({ erro: 'O pagamento online ainda não está disponível. Tente mais tarde.' });
         }
         if (error instanceof PagamentoRecusadoPeloMercadoPago) {
