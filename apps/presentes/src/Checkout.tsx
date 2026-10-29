@@ -19,6 +19,9 @@ type Props = {
   onQuantidade: (id: string, quantidade: number) => void;
   onRemover: (id: string) => void;
   onFechar: () => void;
+  // Who is giving: kept by the page, so closing the checkout doesn't lose what was typed.
+  convidado: Convidado;
+  onConvidado: (convidado: Convidado) => void;
   // The payment went through (card approved) or a Pix is waiting: show the order's screen.
   onConcluido: (pedido: string) => void;
 };
@@ -34,16 +37,21 @@ const formatarCpf = (texto: string) =>
 
 // Gift checkout: review the cart, tell us who is giving, then pay right here with Mercado Pago's
 // Payment Brick (card or Pix). The order is created only when the guest presses "Pagar".
-export function Checkout({ itens, total, onQuantidade, onRemover, onFechar, onConcluido }: Props) {
+export function Checkout({ itens, total, onQuantidade, onRemover, onFechar, onConcluido, convidado, onConvidado }: Props) {
   const [etapa, setEtapa] = useState<Etapa>('carrinho');
-  const [convidado, setConvidado] = useState<Convidado>({ nome: '', email: '', mensagem: '', cpf: '' });
+  // Leaving the payment step asks first: the card typed in Mercado Pago's form would be lost.
+  const [confirmandoSaida, setConfirmandoSaida] = useState(false);
   const [erroDados, setErroDados] = useState('');
   const [aviso, setAviso] = useState('');
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const painel = useRef<HTMLDivElement>(null);
 
+  const fechar = () => (etapa === 'pagamento' ? setConfirmandoSaida(true) : onFechar());
+  const fecharRef = useRef(fechar);
+  fecharRef.current = fechar;
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onFechar();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && fecharRef.current();
     window.addEventListener('keydown', onKey);
     const overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -51,7 +59,7 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar, onCo
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = overflow;
     };
-  }, [onFechar]);
+  }, []);
 
   // Move focus to the top of each step for keyboard and screen-reader users.
   useEffect(() => {
@@ -109,18 +117,26 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar, onCo
   };
 
   const atual = etapas.findIndex(([id]) => id === etapa);
-  const set = (campo: keyof Convidado, valor: string) => setConvidado((c) => ({ ...c, [campo]: valor }));
+  const set = (campo: keyof Convidado, valor: string) => onConvidado({ ...convidado, [campo]: valor });
 
   return (
-    <div className="checkout-overlay" onClick={onFechar}>
-      <div
-        ref={painel}
-        className="checkout"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Finalizar presente"
-        onClick={(e) => e.stopPropagation()}
-      >
+    // A click outside doesn't close it: only the X (or Esc), which asks first on the payment step.
+    <div className="checkout-overlay">
+      <div ref={painel} className="checkout" role="dialog" aria-modal="true" aria-label="Finalizar presente">
+        {confirmandoSaida && (
+          <div className="checkout__confirmar" role="alertdialog" aria-modal="true" aria-labelledby="checkout-sair-titulo">
+            <div className="checkout__confirmar-caixa">
+              <h3 id="checkout-sair-titulo">Sair do pagamento?</h3>
+              <p>Nada foi cobrado. Seus presentes e seus dados continuam guardados para quando quiser voltar.</p>
+              <button className="nv-btn nv-btn--block" onClick={() => setConfirmandoSaida(false)} autoFocus>
+                Continuar pagando
+              </button>
+              <button className="checkout__link" onClick={onFechar}>
+                Sair
+              </button>
+            </div>
+          </div>
+        )}
         <header className="checkout__header">
           <ol className="checkout__steps" aria-label="Etapas">
             {etapas.map(([id, label], i) => (
@@ -134,7 +150,7 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar, onCo
               </li>
             ))}
           </ol>
-          <button className="checkout__close" onClick={onFechar} aria-label="Fechar">
+          <button className="checkout__close" onClick={fechar} aria-label="Fechar">
             ×
           </button>
         </header>
@@ -279,52 +295,24 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar, onCo
               Pagamento
             </h2>
 
-            <ul className="checkout__summary">
-              {itens.map((i) => (
-                <li key={i.id}>
-                  <span>
-                    {i.quantidade > 1 && `${i.quantidade}× `}
-                    {i.nome}
-                  </span>
-                  <span>{formatBRL(i.valorCentavos * i.quantidade)}</span>
-                </li>
-              ))}
-              <li className="checkout__summary-total">
-                <span>Total</span>
-                <span>{formatBRL(total)}</span>
-              </li>
-            </ul>
-
-            <div className="checkout__review">
-              <div>
-                <span className="nv-label">De</span>
-                <p>
-                  {convidado.nome.trim()} · {convidado.email.trim()}
-                </p>
+            {/* Compact, so Mercado Pago's form shows right away (on a phone too). */}
+            <div className="checkout__resumo">
+              <div className="checkout__resumo-linha">
+                <span>
+                  {itens.length === 1 ? itens[0].nome : `${itens.reduce((n, i) => n + i.quantidade, 0)} presentes`}
+                </span>
+                <strong>{formatBRL(total)}</strong>
               </div>
-              {convidado.mensagem.trim() && (
-                <div>
-                  <span className="nv-label">Mensagem</span>
-                  <p className="checkout__review-msg">“{convidado.mensagem.trim()}”</p>
-                </div>
-              )}
-              <button className="checkout__link checkout__link--inline" onClick={() => setEtapa('dados')}>
-                Editar dados
-              </button>
-            </div>
-
-            <div className="checkout__seguranca">
-              <span className="checkout__seguranca-icon">
-                <Icon name="lock" size={22} />
-              </span>
-              <div>
-                <strong>Pagamento seguro pelo Mercado Pago</strong>
-                <p>
-                  Pague com Pix ou cartão em até 12x sem sair do site. O formulário abaixo é do <b>Mercado Pago</b>: os dados
-                  do cartão vão direto para ele, criptografados, e não passam pelo nosso site nem ficam guardados conosco.
-                </p>
+              <div className="checkout__resumo-de">
+                De {convidado.nome.trim()}
+                <button className="checkout__link checkout__link--inline" onClick={() => setEtapa('dados')}>
+                  Editar
+                </button>
               </div>
             </div>
+            <p className="checkout__selo">
+              <Icon name="lock" size={14} /> Pagamento seguro pelo <b>Mercado Pago</b>: os dados do cartão não passam pelo nosso site.
+            </p>
 
             {aviso && (
               <p className="checkout__alert" role="alert">

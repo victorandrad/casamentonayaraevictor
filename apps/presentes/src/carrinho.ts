@@ -13,6 +13,9 @@ type Acao =
 
 const STORAGE_KEY = 'nv_carrinho_presentes';
 export const MAX_QUANTIDADE = 10;
+// A cart nobody touched for this long is forgotten. Only the guest's own changes count: opening the
+// site (which syncs prices and availability) doesn't renew it.
+export const VALIDADE_CARRINHO_MS = 24 * 60 * 60_000;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -21,12 +24,28 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // availability always come from the API (the 'sincronizar' action, as soon as the list loads), and
 // the API recalculates everything again when the order is created.
 type ItemSalvo = { id: string; quantidade: number };
+// `alteradoEm`: when the guest last changed the cart (ms). Carts saved before it existed were plain arrays.
+type CarrinhoSalvo = { itens: ItemSalvo[]; alteradoEm: number };
+
+function lerSalvo(): CarrinhoSalvo | null {
+  try {
+    const salvo: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
+    if (Array.isArray(salvo)) return { itens: salvo, alteradoEm: Date.now() };
+    if (salvo && typeof salvo === 'object' && Array.isArray((salvo as CarrinhoSalvo).itens)) {
+      const { itens, alteradoEm } = salvo as CarrinhoSalvo;
+      return { itens, alteradoEm: Number.isFinite(alteradoEm) ? alteradoEm : 0 };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 function carregar(): ItemCarrinho[] {
+  const salvo = lerSalvo();
+  if (!salvo || Date.now() - salvo.alteradoEm > VALIDADE_CARRINHO_MS) return [];
   try {
-    const salvo: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
-    if (!Array.isArray(salvo)) return [];
-    return salvo
+    return salvo.itens
       .filter(
         (i): i is ItemSalvo =>
           typeof i?.id === 'string' && UUID.test(i.id) && Number.isInteger(i.quantidade) && i.quantidade >= 1 && i.quantidade <= MAX_QUANTIDADE,
@@ -77,11 +96,28 @@ export function useCarrinho() {
   useEffect(() => {
     try {
       const salvar: ItemSalvo[] = itens.map(({ id, quantidade }) => ({ id, quantidade }));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(salvar));
+      // Same gifts and quantities as saved (e.g. only prices synced): keep the date, so a visit alone
+      // doesn't extend the cart's life.
+      const anterior = lerSalvo();
+      const mudou = !anterior || JSON.stringify(anterior.itens) !== JSON.stringify(salvar);
+      const alteradoEm = mudou ? Date.now() : anterior.alteradoEm;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ itens: salvar, alteradoEm } satisfies CarrinhoSalvo));
     } catch {
       // storage blocked: the cart still works for this visit
     }
   }, [itens]);
+
+  // A tab left open past the limit: empty the cart when the guest comes back to it.
+  useEffect(() => {
+    const aoVoltar = () => {
+      const salvo = lerSalvo();
+      if (document.visibilityState === 'visible' && salvo && salvo.itens.length > 0 && Date.now() - salvo.alteradoEm > VALIDADE_CARRINHO_MS) {
+        dispatch({ tipo: 'limpar' });
+      }
+    };
+    document.addEventListener('visibilitychange', aoVoltar);
+    return () => document.removeEventListener('visibilitychange', aoVoltar);
+  }, []);
 
   const total = itens.reduce((soma, i) => soma + i.valorCentavos * i.quantidade, 0);
   const quantidade = itens.reduce((soma, i) => soma + i.quantidade, 0);

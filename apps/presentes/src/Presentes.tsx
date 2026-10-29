@@ -6,7 +6,7 @@ import { iconeDaCategoria } from '@nv/shared/categorias';
 import type { ListaPresentes, Presente } from '@nv/shared/types';
 import { useCarrinho } from './carrinho';
 import { Checkout } from './Checkout';
-import { pedidoEmAberto } from './pagamento';
+import { pedidoEmAberto, type Convidado } from './pagamento';
 import { RetornoPagamento } from './RetornoPagamento';
 import { Paginacao, POR_PAGINA, gravarFiltroNaUrl, lerFiltroDaUrl, type Filtro } from './Paginacao';
 import './presentes.css';
@@ -82,10 +82,14 @@ function GiftGrid({ icon, titulo, gifts, noCarrinho, recemAdicionado, onAdiciona
   );
 }
 
+const CONVIDADO_VAZIO: Convidado = { nome: '', email: '', mensagem: '', cpf: '' };
+
 export default function Presentes() {
   const [lista, setLista] = useState<ListaPresentes | null>(null);
   const [erro, setErro] = useState('');
   const [checkoutAberto, setCheckoutAberto] = useState(false);
+  // What the guest typed in the checkout, kept in memory only (not in the browser's storage: it has the CPF).
+  const [convidado, setConvidado] = useState<Convidado>(CONVIDADO_VAZIO);
   const [recemAdicionado, setRecemAdicionado] = useState<string | null>(null);
   // The order whose screen is open: a payment just made (`novo`), or one still open from an earlier
   // visit (a Pix waiting), which must not touch the cart the guest may have filled since.
@@ -260,8 +264,12 @@ export default function Presentes() {
           onQuantidade={(id, quantidade) => carrinho.dispatch({ tipo: 'quantidade', id, quantidade })}
           onRemover={(id) => carrinho.dispatch({ tipo: 'remover', id })}
           onFechar={() => setCheckoutAberto(false)}
+          convidado={convidado}
+          onConvidado={setConvidado}
           onConcluido={(pedido) => {
             setCheckoutAberto(false);
+            // Paid: the next gift starts with an empty form (the CPF must not linger).
+            setConvidado(CONVIDADO_VAZIO);
             setPedidoAberto({ uid: pedido, novo: true });
           }}
         />

@@ -4,7 +4,7 @@ import type { ItemPedido, PagamentoResultado, PedidoAdmin, PedidoInput, PedidoPu
 import { precoComTaxa } from '@nv/shared/taxas';
 import { query, queryOne, transaction } from './db.ts';
 import { getTaxa, PRESENTE_SELECT, toPresente } from './repo.ts';
-import { enviarRecibo } from './email.ts';
+import { enviarPix, enviarRecibo } from './email.ts';
 import * as mercadoPago from './mercadopago.ts';
 import { chavePublica } from './mercadopagoConta.ts';
 
@@ -215,6 +215,22 @@ export async function pagar(input: PedidoInput): Promise<PagamentoResultado> {
     return { pedido: pedidoUid, status: 'pendente' };
   }
   const status = (await queryOne<{ status: StatusPedido }>('SELECT status FROM pedidos WHERE id = $1', [pedidoId]))!.status;
+  // A Pix waiting: its code also goes by e-mail, in the background (the guest sees it on screen already).
+  const qr = pagamento.point_of_interaction?.transaction_data;
+  if (status === 'aguardando' && qr?.qr_code) {
+    enviarPix({
+      numero: numeroDoPedido(pedidoUid),
+      nome,
+      email,
+      itens: itens.map((i) => ({ nome: i.nome, quantidade: i.quantidade, valorCentavos: i.preco_centavos })),
+      totalCentavos: total,
+      codigo: qr.qr_code,
+      qrBase64: qr.qr_code_base64 ?? null,
+      expiraEm: pagamento.date_of_expiration ? new Date(pagamento.date_of_expiration) : null,
+    })
+      .then(() => console.info(`Pix do pedido ${pedidoUid} enviado para ${email}`))
+      .catch((error) => console.warn(`falha ao enviar o Pix do pedido ${pedidoUid}:`, (error as Error).message));
+  }
   return {
     pedido: pedidoUid,
     status,

@@ -118,6 +118,119 @@ export async function enviarRecibo(r: EmailRecibo) {
   });
 }
 
+// A Pix was generated on the site: the guest gets its QR Code and copy-and-paste code by e-mail too,
+// so they can pay from another device or after closing the page. The QR goes as an inline image
+// attachment (cid:), which mail apps show; data: URLs are usually blocked.
+export type EmailPix = {
+  numero: string;
+  nome: string;
+  email: string;
+  itens: Array<{ nome: string; quantidade: number; valorCentavos: number }>;
+  totalCentavos: number;
+  codigo: string;
+  qrBase64: string | null;
+  expiraEm: Date | null;
+};
+
+export async function enviarPix(r: EmailPix) {
+  const casal = `${casamento.noiva} & ${casamento.noivo}`;
+  const primeiroNome = r.nome.split(' ')[0];
+  const ate = r.expiraEm?.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+  const numero = `#${r.numero}`;
+  const prazo = ate
+    ? `Pague até <strong style="color:#43382f;">${ate}</strong>. Depois disso o Pix vence, nada é cobrado e o presente volta para a lista.`
+    : 'Se o Pix vencer sem pagamento, nada é cobrado e o presente volta para a lista.';
+
+  const linhas = r.itens
+    .map(
+      (i) => `
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #eee3d6;font-size:14px;color:#43382f;">
+            ${i.quantidade > 1 ? `${i.quantidade}× ` : ''}${escapar(i.nome)}
+          </td>
+          <td align="right" style="padding:8px 0;border-bottom:1px solid #eee3d6;font-size:14px;color:#43382f;white-space:nowrap;">
+            ${brl(i.valorCentavos * i.quantidade)}
+          </td>
+        </tr>`,
+    )
+    .join('');
+
+  const html = `<!doctype html>
+<html lang="pt-BR">
+<body style="margin:0;padding:0;background:#f6f1ea;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f1ea;padding:32px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fbf8f3;border:1px solid #e6dccd;border-radius:22px;">
+        <tr><td align="center" style="padding:40px 32px 8px;font-family:Georgia,'Times New Roman',serif;">
+          <div style="font-size:22px;letter-spacing:4px;color:#43382f;">N <span style="color:#c58a83;">&amp;</span> V</div>
+          <h1 style="margin:18px 0 6px;font-weight:normal;font-style:italic;font-size:30px;color:#43382f;">Seu Pix, ${escapar(primeiroNome)}</h1>
+          <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.7;color:#6b5e52;">
+            Abra o app do seu banco, escolha pagar com Pix e escaneie o QR Code ou use o código copia e cola.
+          </p>
+        </td></tr>
+        ${
+          r.qrBase64
+            ? `<tr><td align="center" style="padding:22px 32px 0;">
+          <img src="cid:pix-qrcode" width="220" height="220" alt="QR Code do Pix" style="display:block;width:220px;height:220px;border:1px solid #e6dccd;border-radius:16px;background:#ffffff;padding:8px;">
+        </td></tr>`
+            : ''
+        }
+        <tr><td style="padding:20px 32px 0;font-family:Arial,Helvetica,sans-serif;">
+          <div style="font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#a88f7e;margin-bottom:6px;">Pix copia e cola</div>
+          <div style="background:#f8eeea;border-radius:12px;padding:12px 14px;font-family:'Courier New',monospace;font-size:12px;line-height:1.5;color:#43382f;word-break:break-all;">${escapar(r.codigo)}</div>
+        </td></tr>
+        <tr><td style="padding:16px 32px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.7;color:#6b5e52;">
+          ${prazo}
+        </td></tr>
+        <tr><td style="padding:20px 32px 0;font-family:Arial,Helvetica,sans-serif;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            ${linhas}
+            <tr>
+              <td style="padding:12px 0 0;font-family:Georgia,serif;font-size:17px;color:#8f544e;">Total</td>
+              <td align="right" style="padding:12px 0 0;font-family:Georgia,serif;font-size:19px;color:#8f544e;">${brl(r.totalCentavos)}</td>
+            </tr>
+          </table>
+        </td></tr>
+        <tr><td align="center" style="padding:28px 32px 36px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.7;color:#a88f7e;">
+          Pedido ${numero} · presente para ${escapar(casal)}<br>
+          Assim que o banco confirmar, você recebe o recibo por e-mail.<br>
+          O pagamento é processado com segurança pelo Mercado Pago.
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const texto = [
+    `Seu Pix, ${primeiroNome}`,
+    '',
+    'Abra o app do seu banco, escolha pagar com Pix e use o código copia e cola abaixo:',
+    '',
+    r.codigo,
+    '',
+    ate ? `Pague até ${ate}. Depois disso o Pix vence, nada é cobrado e o presente volta para a lista.` : 'Se o Pix vencer sem pagamento, nada é cobrado e o presente volta para a lista.',
+    '',
+    ...r.itens.map((i) => `- ${i.quantidade > 1 ? `${i.quantidade}x ` : ''}${i.nome}: ${brl(i.valorCentavos * i.quantidade)}`),
+    `Total: ${brl(r.totalCentavos)}`,
+    '',
+    `Pedido ${numero} · presente para ${casal}`,
+    'Assim que o banco confirmar, você recebe o recibo por e-mail.',
+  ].join('\n');
+
+  await transporte.sendMail({
+    from: config.smtp.from,
+    replyTo: config.smtp.replyTo || undefined,
+    to: { name: r.nome, address: r.email },
+    subject: `Seu Pix para presentear ${casal} · ${numero}`,
+    text: texto,
+    html,
+    attachments: r.qrBase64
+      ? [{ filename: 'pix-qrcode.png', content: Buffer.from(r.qrBase64, 'base64'), contentType: 'image/png', cid: 'pix-qrcode' }]
+      : [],
+  });
+}
+
 export type EmailConvite = { nome: string; email: string; convidadoPor: string; link: string; validadeDias: number };
 
 // Invitation to the couple's panel, with the link to create the password.

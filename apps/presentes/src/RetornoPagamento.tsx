@@ -106,8 +106,9 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
           : 'Confirmando pagamento…';
 
   return (
-    <div className="checkout-overlay retorno-overlay" onClick={onFechar}>
-      <div className="retorno nv-fade-up" role="dialog" aria-modal="true" aria-label={titulo} onClick={(e) => e.stopPropagation()}>
+    // Only the X closes it (like the checkout): a stray click must not hide a Pix being paid.
+    <div className="checkout-overlay retorno-overlay">
+      <div className={pix ? 'retorno retorno--pix nv-fade-up' : 'retorno nv-fade-up'} role="dialog" aria-modal="true" aria-label={titulo}>
         <button className="checkout__close retorno__close" onClick={onFechar} aria-label="Fechar">
           ×
         </button>
@@ -119,11 +120,13 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
           </>
         ) : (
           <>
-            <div className={`retorno__icon retorno__icon--${status ?? 'pendente'}`}>
-              <Icon name={status === 'falhou' || status === 'expirado' || status === 'estornado' ? 'clock' : 'heart'} size={38} />
-            </div>
+            {!pix && (
+              <div className={`retorno__icon retorno__icon--${status ?? 'pendente'}`}>
+                <Icon name={status === 'falhou' || status === 'expirado' || status === 'estornado' ? 'clock' : 'heart'} size={38} />
+              </div>
+            )}
             <h2 className="retorno__title">{titulo}</h2>
-            <Ornament className="nv-ornament" />
+            {!pix && <Ornament className="nv-ornament" />}
 
             {status === 'pago' && (
               <p className="retorno__text">
@@ -132,10 +135,7 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
             )}
             {pix && (
               <div className="retorno__pix">
-                <p className="retorno__text">
-                  Abra o app do seu banco, escolha pagar com Pix e escaneie o código ou use o copia e cola.
-                  {pix.expiraEm && ` O presente fica guardado para você até ${horario(pix.expiraEm)}.`}
-                </p>
+                <p className="retorno__text">Abra o app do seu banco, escolha pagar com Pix e escaneie o código ou use o copia e cola.</p>
                 {pix.qrBase64 && <img className="retorno__qr" src={`data:image/png;base64,${pix.qrBase64}`} alt="QR Code do Pix" />}
                 <div className="retorno__copia">
                   <input className="nv-input" readOnly value={pix.codigo} aria-label="Código Pix copia e cola" onFocus={(e) => e.target.select()} />
@@ -145,6 +145,10 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
                 </div>
                 <p className="retorno__aguardando" role="status">
                   <span className="retorno__ponto" aria-hidden /> Esperando a confirmação do banco. Esta tela atualiza sozinha.
+                </p>
+                <p className="retorno__nota">
+                  {pix.expiraEm ? `Pague até ${horario(pix.expiraEm)}: depois disso o Pix vence, nada é cobrado e o presente volta para a lista.` : 'Se o Pix vencer sem pagamento, nada é cobrado e o presente volta para a lista.'}{' '}
+                  Enviamos o QR Code e o código também para o seu e-mail.
                 </p>
               </div>
             )}

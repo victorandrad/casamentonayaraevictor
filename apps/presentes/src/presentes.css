@@ -281,45 +281,7 @@
 }
 .checkout__summary li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 15px; }
 .checkout__summary-total { margin-top: 6px; padding-top: 12px !important; border-top: 1px dashed rgba(197, 138, 131, 0.5); font-family: var(--nv-serif); font-size: 19px !important; color: var(--nv-rose-deep); }
-.checkout__review {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 20px;
-  padding: 16px 20px;
-  border: 1px dashed var(--nv-blush-line);
-  border-radius: 16px;
-}
-.checkout__review .nv-label { margin-bottom: 2px; }
-.checkout__review p { margin: 0; font-size: 15px; color: var(--nv-text); word-break: break-word; }
-.checkout__review-msg { font-family: var(--nv-serif); font-style: italic; }
-.checkout__review .checkout__link--inline { align-self: flex-start; font-size: 13px; }
 
-/* Security notice before paying */
-.checkout__seguranca {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-  padding: 16px 18px;
-  margin: 0 0 16px;
-  border-radius: 16px;
-  background: linear-gradient(160deg, #f1f5ee, #eef3ea);
-  border: 1px solid rgba(111, 138, 90, 0.28);
-}
-.checkout__seguranca-icon {
-  flex: none;
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: #fff;
-  color: #4f6b3e;
-  box-shadow: 0 0 0 1px rgba(111, 138, 90, 0.25);
-}
-.checkout__seguranca strong { display: block; font-family: var(--nv-serif); font-weight: 400; font-size: 17px; color: #3f5631; margin-bottom: 4px; }
-.checkout__seguranca p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--nv-text); }
-.checkout__seguranca b { font-weight: 500; }
 .checkout .nv-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 
 /* The order's screen after paying (thank-you, Pix code) */
@@ -447,3 +409,41 @@
 .retorno__copia .nv-input { flex: 1; margin: 0; font-size: 12px; text-overflow: ellipsis; }
 .retorno__aguardando { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 13px; color: var(--nv-muted); }
 .retorno__ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--nv-rose); animation: retorno-pulse 1.6s ease-in-out infinite; }
+
+/* Payment step: a compact summary so Mercado Pago's form is in view */
+.checkout__resumo { padding: 12px 16px; border: 1px solid var(--nv-border); border-radius: 14px; background: var(--nv-card); margin: 0 0 10px; }
+.checkout__resumo-linha { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; color: var(--nv-ink); }
+.checkout__resumo-linha strong { font-family: var(--nv-serif); font-weight: 400; color: var(--nv-rose-deep); white-space: nowrap; }
+.checkout__resumo-de { display: flex; align-items: baseline; gap: 10px; margin-top: 4px; font-size: 13px; color: var(--nv-muted); }
+.checkout__selo { margin: 0 0 14px; font-size: 12.5px; line-height: 1.5; color: var(--nv-muted); }
+.checkout__selo svg { vertical-align: -2px; margin-right: 4px; }
+.checkout__selo b { font-weight: 500; color: var(--nv-text); }
+
+/* "Sair do pagamento?" over the checkout */
+.checkout__confirmar {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(246, 241, 234, 0.92);
+  backdrop-filter: blur(3px);
+  animation: checkout-fade 0.2s ease both;
+}
+.checkout__confirmar-caixa { width: min(340px, 100%); padding: 26px 24px 14px; border: 1px solid var(--nv-border); border-radius: 18px; background: var(--nv-card); text-align: center; box-shadow: 0 24px 48px -30px rgba(67, 56, 47, 0.45); }
+.checkout__confirmar-caixa h3 { margin: 0 0 8px; font-family: var(--nv-serif); font-weight: 400; font-size: 22px; color: var(--nv-ink); }
+.checkout__confirmar-caixa p { margin: 0 0 18px; font-size: 14px; line-height: 1.6; color: var(--nv-text); }
+
+/* Pix screen: compact, ordinary corners (the arch wastes height and clips the top), QR first */
+.retorno--pix { padding: 26px 22px 20px; border-radius: 26px; }
+.retorno--pix .retorno__title { font-size: 34px; margin-top: 4px; }
+.retorno--pix .retorno__text { margin: 10px 0 0; font-size: 14px; }
+.retorno--pix .retorno__qr { width: 200px; height: 200px; }
+.retorno--pix .checkout__summary { margin-top: 14px; }
+.retorno__nota { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--nv-muted); }
+@media (max-width: 480px) {
+  .retorno--pix { padding: 22px 16px 16px; }
+  .retorno--pix .retorno__qr { width: 180px; height: 180px; }
+}
