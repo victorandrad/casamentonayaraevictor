@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { ICONES_CATEGORIA } from '@nv/shared/categorias';
 import { IDS_MOMENTOS } from '@nv/shared/galeria';
-import type { AplicacaoMercadoPagoInput, CategoriaInput, Configuracoes, ConvidadoInput, FotoGaleriaInput, OrganizacaoLista, PresenteInput } from '@nv/shared/types';
+import type { AplicacaoMercadoPagoInput, CategoriaInput, CredenciaisMercadoPagoInput, Configuracoes, ConvidadoInput, FotoGaleriaInput, OrganizacaoLista, PresenteInput } from '@nv/shared/types';
 import { destroyOtherSessions, requireAuth, requireOwner, SESSION_COOKIE } from '../auth.ts';
 import * as repo from '../repo.ts';
 import { enviarReciboDoPedido, listarPedidos } from '../pedidos.ts';
@@ -485,6 +485,35 @@ export async function adminRoutes(app: FastifyInstance) {
         return reply.code(502).send({ erro: 'Não foi possível falar com o Mercado Pago agora. Tente de novo em instantes.' });
       }
       req.log.info('aplicação do Mercado Pago cadastrada');
+      return mercadoPagoConta.situacao();
+    },
+  );
+
+  app.put<{ Body: CredenciaisMercadoPagoInput }>(
+    '/mercadopago/credenciais',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['publicKey', 'accessToken', 'producao'],
+          additionalProperties: false,
+          properties: {
+            publicKey: { type: 'string', pattern: '^(APP_USR|TEST)-[0-9a-fA-F-]{20,80}$' },
+            accessToken: { type: 'string', pattern: '^(APP_USR|TEST)-[0-9A-Za-z-]{20,200}$' },
+            producao: { type: 'boolean' },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        await mercadoPagoConta.salvarCredenciais(req.body.publicKey, req.body.accessToken, req.body.producao, req.usuario!.id);
+      } catch (error) {
+        if (error instanceof mercadoPagoConta.ErroConexao) return reply.code(400).send({ erro: error.message });
+        req.log.error(error, 'falha ao conferir as credenciais do Mercado Pago');
+        return reply.code(502).send({ erro: 'Não foi possível falar com o Mercado Pago agora. Tente de novo em instantes.' });
+      }
+      req.log.info('conta do Mercado Pago ligada por credenciais');
       return mercadoPagoConta.situacao();
     },
   );

@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { errorMessage } from '@nv/shared/api';
-import type { AplicacaoMercadoPagoInput, ContaMercadoPago as Situacao } from '@nv/shared/types';
+import type { AplicacaoMercadoPagoInput, ContaMercadoPago as Situacao, CredenciaisMercadoPagoInput } from '@nv/shared/types';
 import { adminApi, formatDate } from './adminApi';
 import { useLoad } from './useLoad';
 import { ConfirmarModal } from './Modal';
@@ -143,6 +143,102 @@ function FormAplicacao({
   );
 }
 
+// The other way in: the Public Key and Access Token from the application's credentials (test or
+// production), no OAuth. Handy for testing with the test credentials. The API checks the token with
+// Mercado Pago and keeps it encrypted.
+function FormCredenciais({ onSalva, onCancelar }: { onSalva: (s: Situacao) => void; onCancelar: () => void }) {
+  const [dados, setDados] = useState<CredenciaisMercadoPagoInput>({ publicKey: '', accessToken: '', producao: false });
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  const salvar = async (e: FormEvent) => {
+    e.preventDefault();
+    setSalvando(true);
+    setErro('');
+    try {
+      onSalva(
+        await adminApi<Situacao>('/admin/mercadopago/credenciais', {
+          method: 'PUT',
+          body: { publicKey: dados.publicKey.trim(), accessToken: dados.accessToken.trim(), producao: dados.producao },
+        }),
+      );
+    } catch (error) {
+      setErro(errorMessage(error));
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <form className="painel-mp__form" onSubmit={salvar}>
+      <p className="painel-hint">
+        Em{' '}
+        <a href="https://www.mercadopago.com.br/developers/panel/app" target="_blank" rel="noopener noreferrer">
+          Suas integrações
+        </a>
+        , abra a aplicação e copie a <strong>Public Key</strong> e o <strong>Access Token</strong> das{' '}
+        <strong>Credenciais de teste</strong> (para testar) ou <strong>de produção</strong> (para receber de verdade). O valor
+        cai na conta dona dessas credenciais.
+      </p>
+      <div className="painel-form-row">
+        <div className="painel-field">
+          <label className="nv-label" htmlFor="mp-public-key">
+            Public Key
+          </label>
+          <input
+            id="mp-public-key"
+            className="nv-input"
+            autoComplete="off"
+            value={dados.publicKey}
+            onChange={(e) => setDados({ ...dados, publicKey: e.target.value })}
+            required
+          />
+        </div>
+        <div className="painel-field">
+          <label className="nv-label" htmlFor="mp-access-token">
+            Access Token
+          </label>
+          <input
+            id="mp-access-token"
+            className="nv-input"
+            type="password"
+            autoComplete="off"
+            value={dados.accessToken}
+            onChange={(e) => setDados({ ...dados, accessToken: e.target.value })}
+            required
+          />
+        </div>
+        <div className="painel-field painel-field--sm">
+          <label className="nv-label" htmlFor="mp-ambiente">
+            São credenciais de
+          </label>
+          <select
+            id="mp-ambiente"
+            className="nv-input painel-select"
+            value={dados.producao ? 'producao' : 'teste'}
+            onChange={(e) => setDados({ ...dados, producao: e.target.value === 'producao' })}
+          >
+            <option value="teste">Teste</option>
+            <option value="producao">Produção</option>
+          </select>
+        </div>
+      </div>
+      {erro && (
+        <p className="painel-alert" role="alert">
+          {erro}
+        </p>
+      )}
+      <div className="painel-mp__acoes">
+        <button type="submit" className="nv-btn" disabled={salvando}>
+          {salvando ? 'Conferindo com o Mercado Pago…' : 'Usar estas credenciais'}
+        </button>
+        <button type="button" className="nv-btn-ghost" onClick={onCancelar} disabled={salvando}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
 // "Conectar ao Mercado Pago": the account that receives the gifts, linked with one click (OAuth),
 // after the application is registered once.
 export function ContaMercadoPago() {
@@ -151,6 +247,7 @@ export function ContaMercadoPago() {
   const [indo, setIndo] = useState(false);
   const [desconectando, setDesconectando] = useState(false);
   const [trocandoAplicacao, setTrocandoAplicacao] = useState(false);
+  const [usandoCredenciais, setUsandoCredenciais] = useState(false);
 
   // Coming back from Mercado Pago: drop ?mercadopago from the URL so a reload doesn't repeat the note.
   useEffect(() => {
@@ -175,7 +272,16 @@ export function ContaMercadoPago() {
 
   const conta = data?.conta;
   const aviso = resultado ? RESULTADOS[resultado] : null;
-  const editandoAplicacao = data && (!data.aplicacao || trocandoAplicacao);
+  const editandoAplicacao = data && !usandoCredenciais && (trocandoAplicacao || (!data.aplicacao && !conta));
+
+  const linkCredenciais = (
+    <p className="painel-mp__aplicacao">
+      Para testar, ou sem conectar pelo botão:{' '}
+      <button className="painel-link" onClick={() => setUsandoCredenciais(true)}>
+        usar a Public Key e o Access Token da aplicação
+      </button>
+    </p>
+  );
 
   const linhaAplicacao = data?.aplicacao && (
     <p className="painel-mp__aplicacao">
@@ -201,6 +307,17 @@ export function ContaMercadoPago() {
       )}
       {!data && !erro && <p className="painel-hint">Carregando…</p>}
 
+      {data && usandoCredenciais && (
+        <FormCredenciais
+          onSalva={(s) => {
+            setData(s);
+            setUsandoCredenciais(false);
+            setResultado(null);
+          }}
+          onCancelar={() => setUsandoCredenciais(false)}
+        />
+      )}
+
       {editandoAplicacao && (
         <FormAplicacao
           situacao={data}
@@ -212,8 +329,9 @@ export function ContaMercadoPago() {
           onCancelar={data.aplicacao ? () => setTrocandoAplicacao(false) : undefined}
         />
       )}
+      {editandoAplicacao && !data.aplicacao && linkCredenciais}
 
-      {data && !editandoAplicacao && !conta && (
+      {data && !editandoAplicacao && !usandoCredenciais && !conta && (
         <>
           <p className="painel-hint">
             Os convidados pagam com <strong>Pix</strong> ou <strong>cartão em até 12x</strong> no ambiente seguro do Mercado
@@ -225,10 +343,11 @@ export function ContaMercadoPago() {
             {indo ? 'Abrindo o Mercado Pago…' : 'Conectar ao Mercado Pago'}
           </button>
           {linhaAplicacao}
+          {linkCredenciais}
         </>
       )}
 
-      {data && !editandoAplicacao && conta && (
+      {data && !editandoAplicacao && !usandoCredenciais && conta && (
         <>
           {conta.precisaReconectar && (
             <p className="painel-alert" role="alert">
@@ -241,19 +360,32 @@ export function ContaMercadoPago() {
               {conta.precisaReconectar ? 'Reconectar' : 'Conectada'}
             </span>
             {!conta.producao && <span className="painel-badge painel-badge--pendente">Conta de teste</span>}
+            {conta.origem === 'credenciais' && <span className="painel-badge painel-badge--pendente">Credenciais da aplicação</span>}
             <strong>{conta.apelido ?? conta.email ?? `Conta ${conta.usuarioId}`}</strong>
             {conta.email && conta.apelido && <span>{conta.email}</span>}
           </div>
           <p className="painel-hint">
             Os convidados pagam com Pix ou cartão em até 12x dentro do site, pelo Mercado Pago, e o valor cai nesta conta. Conectada em{' '}
             {formatDate(conta.conectadaEm)}
-            {conta.conectadaPor ? ` por ${conta.conectadaPor}` : ''}. A autorização é renovada sozinha.
+            {conta.conectadaPor ? ` por ${conta.conectadaPor}` : ''}.
+            {conta.origem === 'oauth' ? ' A autorização é renovada sozinha.' : ' Ligada pelas credenciais coladas aqui, que não vencem.'}
             {!conta.producao && ' Esta é uma conta de teste: nenhum pagamento é real.'}
           </p>
           <div className="painel-mp__acoes">
-            <button className="nv-btn-ghost" onClick={conectar} disabled={indo}>
-              {indo ? 'Abrindo o Mercado Pago…' : conta.precisaReconectar ? 'Conectar de novo' : 'Trocar de conta'}
-            </button>
+            {conta.origem === 'credenciais' ? (
+              <button className="nv-btn-ghost" onClick={() => setUsandoCredenciais(true)}>
+                Trocar credenciais
+              </button>
+            ) : (
+              <button className="nv-btn-ghost" onClick={conectar} disabled={indo}>
+                {indo ? 'Abrindo o Mercado Pago…' : conta.precisaReconectar ? 'Conectar de novo' : 'Trocar de conta'}
+              </button>
+            )}
+            {conta.origem === 'credenciais' && data.aplicacao && (
+              <button className="nv-btn-ghost" onClick={conectar} disabled={indo}>
+                {indo ? 'Abrindo o Mercado Pago…' : 'Conectar pelo botão'}
+              </button>
+            )}
             <button className="painel-link painel-link--danger" onClick={() => setDesconectando(true)}>
               Desconectar
             </button>

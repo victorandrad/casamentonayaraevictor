@@ -92,6 +92,8 @@ export type RecadoAdmin = Recado & { visivel: boolean };
 export type PresenteInput = Omit<Presente, 'id' | 'disponivel' | 'presenteados' | 'emPagamento'>;
 export type Configuracoes = { taxa: Taxa };
 export type AplicacaoMercadoPagoInput = { clientId: string; clientSecret: string };
+// Public Key and Access Token of an application's credentials, pasted instead of connecting with OAuth.
+export type CredenciaisMercadoPagoInput = { publicKey: string; accessToken: string; producao: boolean };
 // The Mercado Pago account that receives the gifts, connected from the panel (OAuth).
 // `aplicacao`: the Mercado Pago application registered in the panel (its secret never comes back);
 // `urlDeRetorno`: the redirect URL to register in that application.
@@ -105,7 +107,8 @@ export type ContaMercadoPago = {
     producao: boolean; // false for a Mercado Pago test account
     conectadaEm: string;
     conectadaPor: string | null;
-    expiraEm: string; // authorization renewed automatically before this
+    expiraEm: string | null; // OAuth authorization, renewed automatically before this
+    origem: 'oauth' | 'credenciais'; // connected with the button, or with pasted credentials
     precisaReconectar: boolean; // connected before the in-site checkout (no public key yet)
   } | null;
 };

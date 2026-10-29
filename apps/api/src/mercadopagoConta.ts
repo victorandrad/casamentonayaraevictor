@@ -152,7 +152,7 @@ export async function concluirConexao(usuarioId: number, estado: string, codigo:
      ON CONFLICT (id) DO UPDATE
         SET usuario_mp = EXCLUDED.usuario_mp, apelido = EXCLUDED.apelido, email = EXCLUDED.email,
             access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token,
-            producao = EXCLUDED.producao, expira_em = EXCLUDED.expira_em, public_key = EXCLUDED.public_key,
+            producao = EXCLUDED.producao, expira_em = EXCLUDED.expira_em, public_key = EXCLUDED.public_key, origem = 'oauth',
             conectada_em = now(), conectada_por = EXCLUDED.conectada_por, renovada_em = NULL`,
     [
       tokens.user_id,
@@ -180,6 +180,38 @@ async function perfilDaConta(accessToken: string): Promise<{ nickname?: string; 
   }
 }
 
+// The other way in: the Public Key and Access Token of an application's credentials (test or
+// production), pasted in the panel. No OAuth and no renewal. The token is checked with Mercado Pago
+// first (it must open the account it belongs to), and the public key's shape is checked here.
+export async function salvarCredenciais(publicKey: string, accessToken: string, producao: boolean, usuarioId: number): Promise<void> {
+  let perfil: { id?: number; nickname?: string; email?: string } | null;
+  try {
+    const resposta = await fetch(`${API}/users/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (resposta.status === 401 || resposta.status === 403) {
+      throw new ErroConexao('O Mercado Pago não reconheceu esse Access Token. Confira e tente de novo.');
+    }
+    if (!resposta.ok) throw new Error(`Mercado Pago ${resposta.status} em /users/me`);
+    perfil = (await resposta.json()) as { id?: number; nickname?: string; email?: string };
+  } catch (error) {
+    if (error instanceof ErroConexao) throw error;
+    throw new Error((error as Error).message, { cause: error });
+  }
+  if (!perfil?.id) throw new ErroConexao('O Mercado Pago não devolveu a conta desse Access Token. Confira e tente de novo.');
+  await query(
+    `INSERT INTO mercadopago_conta (id, usuario_mp, apelido, email, access_token, refresh_token, producao, expira_em, conectada_por, public_key, origem)
+     VALUES (1, $1, $2, $3, $4, NULL, $5, NULL, $6, $7, 'credenciais')
+     ON CONFLICT (id) DO UPDATE
+        SET usuario_mp = EXCLUDED.usuario_mp, apelido = EXCLUDED.apelido, email = EXCLUDED.email,
+            access_token = EXCLUDED.access_token, refresh_token = NULL, producao = EXCLUDED.producao,
+            expira_em = NULL, public_key = EXCLUDED.public_key, origem = 'credenciais',
+            conectada_em = now(), conectada_por = EXCLUDED.conectada_por, renovada_em = NULL`,
+    [perfil.id, perfil.nickname ?? null, perfil.email ?? null, cifrar(accessToken), producao, usuarioId, publicKey],
+  );
+}
+
 // Forgets the account: the site stops taking payments until it is connected again. (Mercado Pago
 // keeps the authorization listed in the account's "Aplicações conectadas", where it can be revoked.)
 export async function desconectar(): Promise<void> {
@@ -191,9 +223,10 @@ type ContaRow = {
   apelido: string | null;
   email: string | null;
   access_token: string;
-  refresh_token: string;
+  refresh_token: string | null;
   producao: boolean;
-  expira_em: Date;
+  expira_em: Date | null;
+  origem: 'oauth' | 'credenciais';
   conectada_em: Date;
   conectada_por_nome: string | null;
   public_key: string | null;
@@ -201,7 +234,7 @@ type ContaRow = {
 
 const lerConta = () =>
   queryOne<ContaRow>(
-    `SELECT c.usuario_mp, c.apelido, c.email, c.access_token, c.refresh_token, c.producao, c.expira_em, c.conectada_em,
+    `SELECT c.usuario_mp, c.apelido, c.email, c.access_token, c.refresh_token, c.producao, c.expira_em, c.conectada_em, c.origem,
             c.public_key, u.nome AS conectada_por_nome
        FROM mercadopago_conta c LEFT JOIN usuarios u ON u.id = c.conectada_por`,
   );
@@ -219,7 +252,8 @@ export async function situacao(): Promise<ContaMercadoPago> {
       producao: conta.producao,
       conectadaEm: conta.conectada_em.toISOString(),
       conectadaPor: conta.conectada_por_nome,
-      expiraEm: conta.expira_em.toISOString(),
+      expiraEm: conta.expira_em?.toISOString() ?? null,
+      origem: conta.origem,
       // Connected before the in-site checkout: no public key, so it must be connected again.
       precisaReconectar: !conta.public_key,
     },
@@ -243,6 +277,8 @@ export async function tokenDeAcesso(): Promise<string | null> {
     console.warn('token do Mercado Pago ilegível (a senha do banco mudou?): conecte a conta de novo no painel');
     return null;
   }
+  // Pasted credentials don't expire (and have nothing to renew them with).
+  if (!conta.expira_em || !conta.refresh_token) return atual;
   const renovarEm = conta.expira_em.getTime() - RENOVAR_ANTES_DIAS * 86_400_000;
   if (Date.now() < renovarEm) return atual;
   renovando ??= renovar(conta).finally(() => {
@@ -257,6 +293,7 @@ async function renovar(conta: ContaRow): Promise<string | null> {
   try {
     const aplicacao = await lerAplicacao();
     if (!aplicacao) return null;
+    if (!conta.refresh_token) return null;
     const tokens = await pedirTokens(aplicacao, { grant_type: 'refresh_token', refresh_token: decifrar(conta.refresh_token) });
     await query(
       `UPDATE mercadopago_conta

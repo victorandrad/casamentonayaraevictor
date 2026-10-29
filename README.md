@@ -225,6 +225,8 @@ sequenceDiagram
 4. Em **Credenciais de produção**, copie o **Client ID** e o **Client Secret** para o painel e salve.
 5. Clique em **Conectar ao Mercado Pago** com a conta que vai receber.
 
+**Sem OAuth:** o painel também aceita colar a **Public Key** e o **Access Token** das credenciais da aplicação (de teste ou de produção), em "usar a Public Key e o Access Token da aplicação". O token é conferido com o Mercado Pago, guardado cifrado e não vence; o dinheiro cai na conta dona das credenciais. É o jeito mais rápido de testar com as credenciais de teste.
+
 **Teste:** em *Contas de teste*, crie um vendedor de teste e conecte-o no painel (aparece "Conta de teste"). No site, pague com os [cartões de teste](https://www.mercadopago.com.br/developers/pt/docs/checkout-api-payments/integration-test/test-cards) (titular `APRO` aprova, `OTHE` recusa). Em desenvolvimento, o redirecionamento do OAuth e o webhook precisam de uma URL pública (`SITE_URL`); a tela do pedido consulta o pagamento direto no Mercado Pago.
 
 </details>
