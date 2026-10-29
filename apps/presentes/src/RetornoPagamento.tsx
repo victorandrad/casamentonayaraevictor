@@ -27,6 +27,8 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
   // The cart is cleared once, not on every check.
   const concluido = useRef(false);
   const ultimo = useRef<PedidoPublico | null>(null);
+  // The clock, ticked when the Pix on screen reaches its deadline.
+  const [agora, setAgora] = useState(() => Date.now());
 
   useEffect(() => {
     let ativo = true;
@@ -70,6 +72,15 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
     };
   }, [uid]);
 
+  const expiraEm = pedido?.status === 'aguardando' ? pedido.pix?.expiraEm : null;
+  useEffect(() => {
+    if (!expiraEm) return;
+    const falta = new Date(expiraEm).getTime() - Date.now();
+    if (falta <= 0) return setAgora(Date.now());
+    const timer = setTimeout(() => setAgora(Date.now()), falta + 500);
+    return () => clearTimeout(timer);
+  }, [expiraEm]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onFechar();
     window.addEventListener('keydown', onKey);
@@ -93,11 +104,16 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
   };
 
   const status = pedido?.status;
-  const pix = status === 'aguardando' ? pedido?.pix : null;
+  const pixDoPedido = status === 'aguardando' ? pedido?.pix : null;
+  // Past its deadline the QR Code goes away at once (Mercado Pago cancels it a moment later).
+  const pixVencido = !!pixDoPedido?.expiraEm && new Date(pixDoPedido.expiraEm).getTime() <= agora;
+  const pix = pixVencido ? null : pixDoPedido;
   const titulo =
     status === 'pago'
       ? 'Muito obrigado!'
-      : pix
+      : pixVencido
+        ? 'Pix vencido'
+        : pix
         ? 'Pague com Pix'
         : status === 'aguardando'
         ? 'Quase lá!'
@@ -152,7 +168,13 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
                 </p>
               </div>
             )}
-            {status === 'aguardando' && !pix && (
+            {pixVencido && (
+              <p className="retorno__text">
+                Este Pix venceu e não pode mais ser pago. Nada foi cobrado, e o presente voltou para a lista: se ainda
+                quiser presentear, é só escolher de novo.
+              </p>
+            )}
+            {status === 'aguardando' && !pix && !pixVencido && (
               <p className="retorno__text">
                 Recebemos seu pedido. Assim que o pagamento for confirmado pelo banco, o presente chega para nós.
               </p>

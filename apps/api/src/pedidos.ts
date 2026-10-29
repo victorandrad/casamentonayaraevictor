@@ -247,6 +247,27 @@ export async function aplicarPagamentoMercadoPago(pagamento: Parameters<typeof m
 
 // Used by the thank-you screen. The order's UUID is unguessable, so it works as the guest's
 // access token. If the webhook hasn't arrived yet, ask Mercado Pago.
+// Brings an order up to date with Mercado Pago. A Pix past its deadline that Mercado Pago still shows
+// as waiting is cancelled there first: the gift goes back on the list at that time, so the QR Code
+// (on screen or in the e-mail) must stop working too. Returns whether Mercado Pago has a payment.
+async function atualizarComMercadoPago(uid: string, pixVencido: boolean): Promise<boolean> {
+  let pagamento = await mercadoPago.ultimoPagamentoDoPedido(uid);
+  if (pagamento && pixVencido && pagamento.status === 'pending' && pagamento.payment_method_id === 'pix') {
+    try {
+      pagamento = await mercadoPago.cancelarPagamento(String(pagamento.id));
+      console.info(`Pix vencido do pedido ${uid} cancelado no Mercado Pago`);
+    } catch {
+      // Paid at the last second, or already closed: take what Mercado Pago says now.
+      pagamento = await mercadoPago.buscarPagamento(String(pagamento.id));
+    }
+  }
+  if (pagamento) await aplicarPagamentoMercadoPago(pagamento);
+  return pagamento !== null;
+}
+
+const pixVencido = (p: { status: StatusPedido; pix_expira_em: Date | null }) =>
+  p.status === 'aguardando' && p.pix_expira_em !== null && p.pix_expira_em.getTime() < Date.now();
+
 export async function pedidoPorUid(uid: string): Promise<PedidoPublico | null> {
   const buscar = () => queryOne<PedidoRow>(`SELECT ${PEDIDO_COLS} FROM pedidos WHERE uid = $1`, [uid]);
   let pedido = await buscar();
@@ -254,8 +275,7 @@ export async function pedidoPorUid(uid: string): Promise<PedidoPublico | null> {
   const emAberto = pedido.status === 'pendente' || pedido.status === 'aguardando';
   if (pedido.gateway === 'mercadopago' && emAberto) {
     try {
-      const pagamento = await mercadoPago.ultimoPagamentoDoPedido(uid);
-      if (pagamento) await aplicarPagamentoMercadoPago(pagamento);
+      await atualizarComMercadoPago(uid, pixVencido(pedido));
       pedido = (await buscar())!;
     } catch {
       // keep the stored status if Mercado Pago can't be reached
@@ -344,23 +364,25 @@ async function entregarRecibo(pedido: PedidoRow): Promise<boolean> {
 }
 
 // Orders whose outcome may have been missed: "pendente" ones (Mercado Pago didn't answer clearly when
-// paying) and Pix still "aguardando" after expiring (the paid or expired notice may have been lost).
+// paying) and Pix still "aguardando" after expiring (the paid or expired notice may have been lost;
+// one Mercado Pago still shows as waiting is cancelled there, see atualizarComMercadoPago).
 // Ask Mercado Pago what happened. A "pendente" with no payment after a while had none, and is closed.
 // Runs from server.ts every few minutes.
 export async function conciliarPendentes(): Promise<void> {
-  const pendentes = await query<{ uid: string; antigo: boolean }>(
-    `SELECT uid, status = 'pendente' AND criado_em < now() - interval '15 minutes' AS antigo FROM pedidos
+  const pendentes = await query<{ uid: string; antigo: boolean; pix_vencido: boolean }>(
+    `SELECT uid, status = 'pendente' AND criado_em < now() - interval '15 minutes' AS antigo,
+            status = 'aguardando' AND pix_expira_em < now() AS pix_vencido
+       FROM pedidos
       WHERE gateway = 'mercadopago' AND criado_em > now() - interval '2 days'
         AND ((status = 'pendente' AND mp_preferencia_id IS NULL AND criado_em < now() - interval '1 minute')
           OR (status = 'aguardando' AND coalesce(pix_expira_em, criado_em + interval '90 minutes') < now()))
       ORDER BY criado_em
       LIMIT 20`,
   );
-  for (const { uid, antigo } of pendentes) {
+  for (const { uid, antigo, pix_vencido } of pendentes) {
     try {
-      const pagamento = await mercadoPago.ultimoPagamentoDoPedido(uid);
-      if (pagamento) await aplicarPagamentoMercadoPago(pagamento);
-      else if (antigo) await query("UPDATE pedidos SET status = 'expirado' WHERE uid = $1 AND status = 'pendente'", [uid]);
+      const temPagamento = await atualizarComMercadoPago(uid, pix_vencido);
+      if (!temPagamento && antigo) await query("UPDATE pedidos SET status = 'expirado' WHERE uid = $1 AND status = 'pendente'", [uid]);
     } catch (error) {
       console.warn(`não foi possível conciliar o pedido ${uid}:`, (error as Error).message);
     }

@@ -249,6 +249,11 @@ export async function sincronizarPagamento(p: Pagamento): Promise<number | null>
 
 export const buscarPagamento = (id: string) => mp<Pagamento>(`/v1/payments/${encodeURIComponent(id)}`);
 
+// Cancels a payment still waiting (a Pix past its deadline), so its QR Code can't be paid any more.
+// Mercado Pago refuses it if the payment was settled meanwhile (e.g. paid at the last second).
+export const cancelarPagamento = (id: string) =>
+  mp<Pagamento>(`/v1/payments/${encodeURIComponent(id)}`, { method: 'PUT', body: { status: 'cancelled' } });
+
 // For the return page when the webhook hasn't arrived yet: the latest payment of this order.
 export async function ultimoPagamentoDoPedido(uid: string): Promise<Pagamento | null> {
   const busca = await mp<{ results: Pagamento[] }>(
