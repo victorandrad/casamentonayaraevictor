@@ -62,8 +62,9 @@ export function AvisoCookies() {
 
       {!personalizando ? (
         <p className="shell-cookies__texto">
-          Guardamos no seu navegador só o necessário para o site funcionar, como o carrinho de presentes. O mapa do
-          local é do Google e pode usar cookies próprios: escolha se quer permitir.
+          Guardamos no seu navegador só o necessário para o site funcionar, como o carrinho de presentes. Na hora de
+          pagar, o formulário seguro do Mercado Pago é carregado no site. O mapa do local é do Google e pode usar
+          cookies próprios: escolha se quer permitir.
         </p>
       ) : (
         <ul className="shell-cookies__categorias">
@@ -73,12 +74,24 @@ export function AvisoCookies() {
                 Essenciais <small>sempre ativos</small>
               </label>
               <p className="shell-cookies__descricao">
-                O carrinho e o pagamento em andamento, a abertura do mapa já vista e o login do painel dos noivos.
-                Ficam só no seu navegador, sem rastreamento nem anúncios. Na hora de pagar, o
-                formulário do Mercado Pago é carregado no site e usa cookies próprios para a segurança da compra.
+                O carrinho de presentes (guardado por até 24 horas), o pedido ou Pix em andamento, a abertura do mapa já
+                vista e o login do painel dos noivos. Ficam só no seu navegador, sem rastreamento nem anúncios.
               </p>
             </div>
             <Interruptor id="cookies-essenciais" ligado bloqueado />
+          </li>
+          <li className="shell-cookies__categoria">
+            <div>
+              <label className="shell-cookies__nome" htmlFor="cookies-pagamento">
+                Pagamento (Mercado Pago) <small>necessário para pagar</small>
+              </label>
+              <p className="shell-cookies__descricao">
+                Só na etapa de pagamento, o site carrega o formulário seguro e o script antifraude do Mercado Pago, que
+                identifica o dispositivo e usa cookies próprios para proteger a compra. Os dados do cartão vão direto
+                para o Mercado Pago, sem passar pelo site. Se você não chegar ao pagamento, nada disso é carregado.
+              </p>
+            </div>
+            <Interruptor id="cookies-pagamento" ligado bloqueado />
           </li>
           {OPCIONAIS.map((c) => (
             <li key={c.chave} className="shell-cookies__categoria">
