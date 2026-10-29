@@ -6,7 +6,7 @@ import { iconeDaCategoria } from '@nv/shared/categorias';
 import type { ListaPresentes, Presente } from '@nv/shared/types';
 import { useCarrinho } from './carrinho';
 import { Checkout } from './Checkout';
-import { cancelarPagamentoPendente, lerRetornoDoStripe, limparRetornoDaUrl } from './pagamento';
+import { cancelarPagamentoPendente, lerRetornoDoPagamento, limparRetornoDaUrl } from './pagamento';
 import { RetornoPagamento } from './RetornoPagamento';
 import { Paginacao, POR_PAGINA, gravarFiltroNaUrl, lerFiltroDaUrl, type Filtro } from './Paginacao';
 import './presentes.css';
@@ -87,14 +87,14 @@ export default function Presentes() {
   const [erro, setErro] = useState('');
   const [checkoutAberto, setCheckoutAberto] = useState(false);
   const [recemAdicionado, setRecemAdicionado] = useState<string | null>(null);
-  const [retorno] = useState(lerRetornoDoStripe);
+  const [retorno] = useState(lerRetornoDoPagamento);
   const [retornoAberto, setRetornoAberto] = useState(retorno?.tipo === 'sucesso');
   const [avisoCancelado, setAvisoCancelado] = useState(retorno?.tipo === 'cancelado');
   const [filtro, setFiltro] = useState<Filtro>(lerFiltroDaUrl);
   const topoDaLista = useRef<HTMLDivElement>(null);
   const carrinho = useCarrinho();
 
-  // Coming back from Stripe: drop ?pedido from the URL so a reload doesn't repeat it.
+  // Coming back from Mercado Pago: drop ?pedido (and its parameters) from the URL so a reload doesn't repeat it.
   useEffect(() => {
     if (retorno) limparRetornoDaUrl();
     if (retorno?.tipo !== 'cancelado') return;
@@ -123,7 +123,7 @@ export default function Presentes() {
     // release it first so the list shows them as available again.
     cancelarPagamentoPendente(retorno?.tipo === 'sucesso' ? retorno.pedido : undefined).finally(carregarLista);
 
-    // Back button from Stripe restores this page from cache: same thing.
+    // Back button from Mercado Pago restores this page from cache: same thing.
     const onPageShow = (e: PageTransitionEvent) => {
       if (!e.persisted) return;
       cancelarPagamentoPendente().then((cancelou) => {

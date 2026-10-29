@@ -8,7 +8,7 @@
 # e os secrets/variables de produção abaixo, que o script grava em /opt/casamento/segredos.env.
 # Sem o secret VPS_SSH_KEY, o deploy é pulado com um aviso.
 #
-# Secrets:   VPS_SSH_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+# Secrets:   VPS_SSH_KEY, ADMIN_EMAIL, ADMIN_PASSWORD
 # Variables: ADMIN_NOME, EMAIL_FROM, EMAIL_REPLY_TO
 # (Os recibos saem pelo servidor de e-mail compartilhado, configurado no .env do servidor: não há SMTP aqui.)
 # Os vazios ficam de fora (a API usa o padrão dela).
@@ -59,8 +59,6 @@ jobs:
           REGISTRO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           ADMIN_NOME: ${{ vars.ADMIN_NOME }}
           EMAIL_FROM: ${{ vars.EMAIL_FROM }}
           EMAIL_REPLY_TO: ${{ vars.EMAIL_REPLY_TO }}
@@ -75,7 +73,7 @@ jobs:
           printf '%s\n' "$VPS_HOST_KEY" > ~/.ssh/known_hosts
           # Terceira linha: NOME=valor-em-base64 de cada valor preenchido, tudo em base64.
           segredos=$(
-            for nome in ADMIN_EMAIL ADMIN_NOME ADMIN_PASSWORD STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET \
+            for nome in ADMIN_EMAIL ADMIN_NOME ADMIN_PASSWORD \
                         EMAIL_FROM EMAIL_REPLY_TO; do
               valor=$(printenv "$nome" || true)
               [ -n "$valor" ] && printf '%s=%s\n' "$nome" "$(printf '%s' "$valor" | base64 -w0)"

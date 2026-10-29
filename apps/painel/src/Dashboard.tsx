@@ -24,7 +24,10 @@ const abas = [
 type AbaId = (typeof abas)[number]['id'];
 
 export function Dashboard({ usuario, onSair, onUsuario }: { usuario: Usuario; onSair: () => void; onUsuario: (u: Usuario) => void }) {
-  const [aba, setAba] = useState<AbaId>('resumo');
+  // Back from connecting Mercado Pago (?mercadopago=…): open Configurações, where the result shows.
+  const [aba, setAba] = useState<AbaId>(() =>
+    usuario.dono && new URLSearchParams(location.search).has('mercadopago') ? 'configuracoes' : 'resumo',
+  );
   // Configurações only for the master user (the API enforces it too).
   const visiveis = abas.filter((a) => !('master' in a) || usuario.dono);
   const barra = useRef<HTMLElement>(null);

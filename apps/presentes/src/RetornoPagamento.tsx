@@ -9,7 +9,7 @@ type Props = { uid: string; onConcluido: () => void; onFechar: () => void };
 
 const TENTATIVAS = 6;
 
-// Shown when Stripe sends the guest back. Polls briefly because the payment
+// Shown when Mercado Pago sends the guest back. Polls briefly because the payment
 // confirmation (webhook) can land a few seconds after the redirect.
 export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
   const [pedido, setPedido] = useState<PedidoPublico | null>(null);
@@ -53,7 +53,7 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
       ? 'Muito obrigado!'
       : status === 'aguardando'
         ? 'Quase lá!'
-        : status === 'falhou' || status === 'expirado'
+        : status === 'falhou' || status === 'expirado' || status === 'estornado'
           ? 'Pagamento não concluído'
           : 'Confirmando pagamento…';
 
@@ -72,7 +72,7 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
         ) : (
           <>
             <div className={`retorno__icon retorno__icon--${status ?? 'pendente'}`}>
-              <Icon name={status === 'falhou' || status === 'expirado' ? 'clock' : 'heart'} size={38} />
+              <Icon name={status === 'falhou' || status === 'expirado' || status === 'estornado' ? 'clock' : 'heart'} size={38} />
             </div>
             <h2 className="retorno__title">{titulo}</h2>
             <Ornament className="nv-ornament" />
@@ -87,7 +87,7 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
                 Recebemos seu pedido. Assim que o pagamento for confirmado pelo banco, o presente chega para nós.
               </p>
             )}
-            {(status === 'falhou' || status === 'expirado') && (
+            {(status === 'falhou' || status === 'expirado' || status === 'estornado') && (
               <p className="retorno__text">
                 O pagamento não foi concluído e nada foi cobrado. Seus presentes continuam no carrinho para tentar de novo.
               </p>

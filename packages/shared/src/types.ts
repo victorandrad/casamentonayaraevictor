@@ -88,9 +88,27 @@ export type ConvidadoInput = { nome: string; limiteAcompanhantes: number };
 export type RecadoAdmin = Recado & { visivel: boolean };
 export type PresenteInput = Omit<Presente, 'id' | 'disponivel' | 'presenteados'>;
 export type Configuracoes = { taxa: Taxa };
+export type AplicacaoMercadoPagoInput = { clientId: string; clientSecret: string };
+// The Mercado Pago account that receives the gifts, connected from the panel (OAuth).
+// `aplicacao`: the Mercado Pago application registered in the panel (its secret never comes back);
+// `urlDeRetorno`: the redirect URL to register in that application.
+export type ContaMercadoPago = {
+  urlDeRetorno: string;
+  aplicacao: { clientId: string } | null;
+  conta: {
+    usuarioId: string;
+    apelido: string | null;
+    email: string | null;
+    producao: boolean; // false for a Mercado Pago test account
+    conectadaEm: string;
+    conectadaPor: string | null;
+    expiraEm: string; // authorization renewed automatically before this
+  } | null;
+};
 
-// Gift orders (Stripe Checkout)
-export type StatusPedido = 'pendente' | 'aguardando' | 'pago' | 'falhou' | 'expirado';
+// Gift orders (Mercado Pago Checkout Pro; older ones went through Stripe)
+// 'estornado': refunded or charged back after being paid; the gifts are free again.
+export type StatusPedido = 'pendente' | 'aguardando' | 'pago' | 'falhou' | 'expirado' | 'estornado';
 export type PedidoInput = {
   itens: Array<{ presenteId: string; quantidade: number }>;
   convidado: { nome: string; email: string; mensagem: string };
@@ -112,7 +130,7 @@ export type PedidoAdmin = PedidoPublico & {
   mensagem: string;
   criadoEm: string;
   pagoEm: string | null;
-  // Filled from Stripe once the payment settles (null while unknown)
+  // Filled from the payment once it settles (null while unknown)
   formaPagamento: string | null;
   bandeira: string | null;
   taxaCentavos: number | null;

@@ -1,13 +1,13 @@
 // Gift fee. Gifts are registered with the amount the couple wants; the guest
 // sees and pays that amount plus a fee per product: a percentage plus a fixed
-// amount (default 5,99% + R$ 0,39, Stripe's international card rate, so any
+// amount (default 5,99% + R$ 0,39, above Mercado Pago's card rate, so any
 // payment method is covered).
 
 export type Taxa = { percentual: number; fixoCentavos: number };
 
 export const TAXA_PADRAO: Taxa = { percentual: 5.99, fixoCentavos: 39 };
 
-// Guest price of one unit of a product. Stripe takes the percentage over the
+// Guest price of one unit of a product. The gateway takes the percentage over the
 // amount actually charged (fee included), so the price is solved backwards:
 // preço − (preço × percentual + fixo) = valor  →  preço = (valor + fixo) / (1 − percentual).
 // Rounded up, so the couple never nets less than the registered value.

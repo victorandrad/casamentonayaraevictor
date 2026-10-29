@@ -27,10 +27,8 @@ export const config = {
   ownerEmail: (env.ADMIN_EMAIL ?? '').trim().toLowerCase(),
   inviteDays: 7,
   resetMinutes: 60,
-  // Public address of the site, used for Stripe's return URLs
+  // Public address of the site, used for the payment return URLs and the webhook
   siteUrl: (env.SITE_URL ?? 'http://localhost:4000').replace(/\/$/, ''),
-  stripeSecretKey: env.STRIPE_SECRET_KEY ?? '',
-  stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET ?? '',
   // Uploaded gift photos (a Docker volume in production)
   uploadsDir: env.UPLOADS_DIR ?? join(import.meta.dirname, '..', 'uploads'),
   // Receipt e-mails over SMTP (local Mailpit by default)

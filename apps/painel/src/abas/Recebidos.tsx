@@ -14,6 +14,7 @@ const statusLabel: Record<StatusPedido, string> = {
   pendente: 'No checkout',
   falhou: 'Falhou',
   expirado: 'Não concluído',
+  estornado: 'Estornado',
 };
 const badge: Record<StatusPedido, string> = {
   pago: 'sim',
@@ -21,9 +22,10 @@ const badge: Record<StatusPedido, string> = {
   pendente: 'pendente',
   falhou: 'nao',
   expirado: 'nao',
+  estornado: 'nao',
 };
 
-const nomesForma: Record<string, string> = { card: 'Cartão', pix: 'Pix', boleto: 'Boleto', link: 'Link' };
+const nomesForma: Record<string, string> = { card: 'Cartão', pix: 'Pix', boleto: 'Boleto', link: 'Link', mercadopago: 'Saldo Mercado Pago' };
 const nomeForma = (forma: string | null) => (forma ? (nomesForma[forma] ?? forma) : 'Outra');
 const capitalizar = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -96,8 +98,8 @@ export function Recebidos() {
         </button>
       </div>
       <p className="painel-hint">
-        Pagamentos feitos pelo Stripe. As taxas são as cobradas de verdade pelo Stripe em cada pagamento, conforme a forma
-        usada (cartão, Pix…). O valor líquido cai na conta Stripe e segue para o banco nos repasses.
+        Pagamentos feitos pelo Mercado Pago. As taxas são as cobradas de verdade em cada pagamento, conforme a forma usada
+        (cartão, Pix…). O valor líquido cai na conta do Mercado Pago de vocês.
       </p>
 
       {erro && (
@@ -116,14 +118,14 @@ export function Recebidos() {
             </div>
             <div className="painel-stat">
               <span className="painel-stat__value">{formatBRL(totais.taxa)}</span>
-              <span className="painel-stat__label">taxas do Stripe</span>
+              <span className="painel-stat__label">taxas do pagamento</span>
               <span className="painel-stat__hint">{percentual(totais.taxa, totais.bruto - pendentesBruto(pagos))} em média</span>
             </div>
             <div className="painel-stat painel-stat--destaque">
               <span className="painel-stat__value">{formatBRL(totais.liquido)}</span>
               <span className="painel-stat__label">líquido para vocês</span>
               {totais.pendentes > 0 && (
-                <span className="painel-stat__hint">{totais.pendentes} taxa(s) ainda sendo calculada(s) pelo Stripe</span>
+                <span className="painel-stat__hint">{totais.pendentes} taxa(s) ainda sendo calculada(s)</span>
               )}
             </div>
           </div>
@@ -246,7 +248,7 @@ export function Recebidos() {
                     </span>
                   </>
                 ) : (
-                  <span className="painel-pedido-taxa">Taxa sendo calculada pelo Stripe</span>
+                  <span className="painel-pedido-taxa">Taxa sendo calculada</span>
                 ))}
             </div>
           </li>

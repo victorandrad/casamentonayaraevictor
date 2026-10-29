@@ -309,7 +309,7 @@ export async function categoriaExiste(id: number): Promise<boolean> {
 
 // ---- Presentes ----
 
-// How long an unpaid checkout keeps its gifts reserved. Stripe sessions are
+// How long an unpaid checkout keeps its gifts reserved. Mercado Pago preferences are
 // created to expire after 30 minutes; a little slack covers clock differences.
 export const RESERVA_MINUTOS = 35;
 

@@ -6,7 +6,7 @@
 # As imagens vêm prontas do registro do GitHub (build feito uma vez no CI): o VPS não compila nada.
 # API_TAG/WEB_TAG = commit publicado (o casamento-deploy grava no .env a cada deploy).
 # .env (fora do git, criado uma vez no servidor): DOMINIO, POSTGRES_*, API_TAG, WEB_TAG.
-# segredos.env: login do painel, Stripe e remetente dos e-mails, vindos dos secrets/variables do GitHub e gravados pelo
+# segredos.env: login do painel e remetente dos e-mails, vindos dos secrets/variables do GitHub e gravados pelo
 # casamento-deploy a cada deploy. Nenhuma porta aberta no servidor: só o Traefik chega ao web, pela
 # rede casamento-nv_default.
 services:

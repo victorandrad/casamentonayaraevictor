@@ -25,7 +25,7 @@ export type EmailRecibo = {
 const brl = (centavos: number) => (centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const escapar = (texto: string) =>
   texto.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
-const nomesForma: Record<string, string> = { card: 'Cartão', pix: 'Pix', link: 'Link' };
+const nomesForma: Record<string, string> = { card: 'Cartão', pix: 'Pix', link: 'Link', mercadopago: 'Saldo Mercado Pago' };
 
 export async function enviarRecibo(r: EmailRecibo) {
   const casal = `${casamento.noiva} & ${casamento.noivo}`;
@@ -86,7 +86,7 @@ export async function enviarRecibo(r: EmailRecibo) {
         }
         <tr><td align="center" style="padding:30px 32px 36px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.7;color:#a88f7e;">
           Com carinho, ${escapar(casal)}<br>
-          O pagamento foi processado com segurança pelo Stripe.
+          O pagamento foi processado com segurança pelo Mercado Pago.
         </td></tr>
       </table>
     </td></tr>

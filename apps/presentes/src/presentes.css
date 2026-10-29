@@ -322,7 +322,7 @@
 .checkout__seguranca b { font-weight: 500; }
 .checkout .nv-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 
-/* Full-panel screen while we hand the guest over to Stripe */
+/* Full-panel screen while we hand the guest over to Mercado Pago */
 .checkout { position: relative; }
 .checkout__redirect {
   position: absolute;
@@ -371,7 +371,7 @@
   .checkout__redirect-dots i { animation: none; }
 }
 
-/* Return from Stripe */
+/* Return from Mercado Pago */
 .retorno-overlay { justify-content: center; align-items: center; padding: 18px; }
 .retorno {
   position: relative;
@@ -404,7 +404,7 @@
 .retorno__text { font-size: 15px; line-height: 1.7; color: var(--nv-text); margin: 18px 0 20px; }
 .retorno__ok { margin-top: 6px; }
 
-/* Note after coming back from Stripe without paying. With gifts in the cart it sits right above the
+/* Note after coming back from Mercado Pago without paying. With gifts in the cart it sits right above the
    floating cart, pointing down at it; otherwise it is centred at the bottom. */
 .presentes-aviso {
   position: fixed;

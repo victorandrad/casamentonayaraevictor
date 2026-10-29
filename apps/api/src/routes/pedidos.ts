@@ -45,7 +45,7 @@ export async function pedidosRoutes(app: FastifyInstance) {
       },
     },
     async (req, reply): Promise<PedidoCriado | void> => {
-      if (!pagamentoDisponivel()) return reply.code(503).send({ erro: 'O pagamento online ainda não está disponível. Tente mais tarde.' });
+      if (!(await pagamentoDisponivel())) return reply.code(503).send({ erro: 'O pagamento online ainda não está disponível. Tente mais tarde.' });
       const nome = req.body.convidado.nome.trim();
       if (!nome) return reply.code(400).send({ erro: 'Informe seu nome.' });
       if (pedidosLimiter.hit(req.ip)) {

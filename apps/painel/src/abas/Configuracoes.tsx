@@ -5,6 +5,7 @@ import { errorMessage } from '@nv/shared/api';
 import type { Configuracoes as ConfigData, Usuario } from '@nv/shared/types';
 import { adminApi } from '../adminApi';
 import { useLoad } from '../useLoad';
+import { ContaMercadoPago } from '../ContaMercadoPago';
 
 const carregar = () => adminApi<ConfigData>('/admin/configuracoes');
 
@@ -33,21 +34,15 @@ export function Configuracoes({ usuario }: { usuario: Usuario }) {
           {erro}
         </p>
       )}
-      <div className="painel-card painel-narrow">
-        <h3 className="painel-h3">Formas de pagamento</h3>
-        <p className="painel-hint">
-          Os convidados pagam com <strong>Pix</strong> ou <strong>cartão</strong> no ambiente seguro do Stripe, e o valor cai
-          na conta Stripe de vocês. Não é preciso cadastrar chave Pix aqui: as formas de pagamento são ativadas no painel do
-          Stripe, em Configurações → Formas de pagamento.
-        </p>
-      </div>
+      <ContaMercadoPago />
 
       <form className="painel-card painel-narrow" onSubmit={salvar}>
         <h3 className="painel-h3">Taxa dos presentes</h3>
         <p className="painel-hint">
           Taxa do pagamento embutida no preço de cada presente. O cálculo é feito de trás para frente, para que, depois do
-          desconto do Stripe, sobre exatamente o valor cadastrado. O padrão (5,99% + R$ 0,39) é a taxa de cartão
-          internacional, o caso mais caro, então qualquer forma de pagamento fica coberta.
+          desconto do Mercado Pago, sobre exatamente o valor cadastrado. No Mercado Pago, cartão com recebimento na hora
+          custa 4,98% e Pix 0,99%; o padrão (5,99% + R$ 0,39) cobre qualquer forma de pagamento. Juros do parcelamento
+          ficam por conta do convidado, a não ser que vocês ofereçam parcelas sem juros na conta do Mercado Pago.
         </p>
         <div className="painel-form-row">
           <div className="painel-field painel-field--sm">

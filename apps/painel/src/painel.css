@@ -705,3 +705,18 @@
 /* Login: "Esqueci minha senha" */
 .painel-login__esqueci { display: block; margin: 14px auto 0; background: none; border: 0; padding: 4px; font: inherit; font-size: 14px; color: var(--nv-rose-link); cursor: pointer; }
 .painel-login__esqueci:hover { color: var(--nv-rose-deep); text-decoration: underline; }
+
+/* Mercado Pago connection (Configurações) */
+.painel-mp__aviso { margin: 0 0 16px; font-size: 13px; color: var(--nv-rose-deep); }
+.painel-mp__botao { background: #009ee3; border-color: #009ee3; }
+.painel-mp__botao:hover:not(:disabled) { background: #0089c6; border-color: #0089c6; }
+.painel-mp__conta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 0 12px; font-size: 14px; color: var(--nv-text); }
+.painel-mp__conta strong { font-weight: 500; color: var(--nv-ink); }
+.painel-mp__acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.painel-mp__passos { margin: 0 0 18px; padding-left: 20px; font-size: 13.5px; line-height: 1.7; color: var(--nv-text); }
+.painel-mp__passos li + li { margin-top: 6px; }
+.painel-mp__url { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 6px; }
+.painel-mp__url code,
+.painel-mp__aplicacao code { padding: 2px 8px; border-radius: 6px; background: var(--nv-blush-soft); font-size: 12px; word-break: break-all; }
+.painel-mp__aplicacao { margin: 16px 0 0; font-size: 12.5px; color: var(--nv-muted); }
+.painel-mp__form .painel-mp__acoes { margin-top: 16px; }

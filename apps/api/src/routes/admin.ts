@@ -1,10 +1,11 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { ICONES_CATEGORIA } from '@nv/shared/categorias';
 import { IDS_MOMENTOS } from '@nv/shared/galeria';
-import type { CategoriaInput, Configuracoes, ConvidadoInput, FotoGaleriaInput, OrganizacaoLista, PresenteInput } from '@nv/shared/types';
+import type { AplicacaoMercadoPagoInput, CategoriaInput, Configuracoes, ConvidadoInput, FotoGaleriaInput, OrganizacaoLista, PresenteInput } from '@nv/shared/types';
 import { destroyOtherSessions, requireAuth, requireOwner, SESSION_COOKIE } from '../auth.ts';
 import * as repo from '../repo.ts';
 import { enviarReciboDoPedido, listarPedidos } from '../pedidos.ts';
+import * as mercadoPagoConta from '../mercadopagoConta.ts';
 import { ImagemInvalida, LADO_GALERIA, LADO_PRESENTE, removerImagem, salvarImagem, TIPOS_ACEITOS } from '../uploads.ts';
 import * as usuarios from '../usuarios.ts';
 
@@ -72,11 +73,11 @@ const notFound = { erro: 'Item não encontrado.' };
 
 export async function adminRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAuth);
-  // Changing the settings is for the master only (the settings stay readable: the gift list shows
-  // the fee from them).
+  // Changing the settings and the Mercado Pago account are for the master only (the settings stay
+  // readable: the gift list shows the fee from them).
   app.addHook('preHandler', async (req, reply) => {
     const rota = req.routeOptions.url ?? '';
-    if (rota === '/api/admin/configuracoes' && req.method !== 'GET') {
+    if ((rota === '/api/admin/configuracoes' && req.method !== 'GET') || rota.startsWith('/api/admin/mercadopago')) {
       return requireOwner(req, reply);
     }
   });
@@ -413,7 +414,7 @@ export async function adminRoutes(app: FastifyInstance) {
     return reply.code(204).send();
   });
 
-  // Presentes recebidos (pedidos do Stripe)
+  // Presentes recebidos (pedidos pagos)
   app.get('/pedidos', async () => listarPedidos());
 
   app.post<{ Params: { id: string } }>('/pedidos/:id/recibo', { schema: { params: uidParams } }, async (req, reply) =>
@@ -455,4 +456,66 @@ export async function adminRoutes(app: FastifyInstance) {
       return lerConfiguracoes();
     },
   );
+
+  // Mercado Pago: "Conectar ao Mercado Pago" sends the couple to authorize the application, and
+  // Mercado Pago brings them back to /retorno, which goes on to the panel with the result.
+  app.get('/mercadopago', async () => mercadoPagoConta.situacao());
+
+  app.put<{ Body: AplicacaoMercadoPagoInput }>(
+    '/mercadopago/aplicacao',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['clientId', 'clientSecret'],
+          additionalProperties: false,
+          properties: {
+            clientId: { type: 'string', pattern: '^[0-9]{6,30}$' },
+            clientSecret: { type: 'string', minLength: 16, maxLength: 200, pattern: '^\\S+$' },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        await mercadoPagoConta.salvarAplicacao(req.body.clientId, req.body.clientSecret, req.usuario!.id);
+      } catch (error) {
+        if (error instanceof mercadoPagoConta.ErroConexao) return reply.code(400).send({ erro: error.message });
+        req.log.error(error, 'falha ao conferir a aplicação do Mercado Pago');
+        return reply.code(502).send({ erro: 'Não foi possível falar com o Mercado Pago agora. Tente de novo em instantes.' });
+      }
+      req.log.info('aplicação do Mercado Pago cadastrada');
+      return mercadoPagoConta.situacao();
+    },
+  );
+
+  app.post('/mercadopago/conectar', async (req, reply) => {
+    try {
+      return { url: await mercadoPagoConta.iniciarConexao(req.usuario!.id) };
+    } catch (error) {
+      if (error instanceof mercadoPagoConta.ErroConexao) return reply.code(400).send({ erro: error.message });
+      throw error;
+    }
+  });
+
+  app.get<{ Querystring: { code?: string; state?: string; error?: string } }>('/mercadopago/retorno', async (req, reply) => {
+    const voltar = (resultado: string) => reply.redirect(`/painel?mercadopago=${resultado}`);
+    const { code, state } = req.query;
+    // Declined on Mercado Pago's page (or came back without a code).
+    if (!code || !state) return voltar('cancelado');
+    try {
+      await mercadoPagoConta.concluirConexao(req.usuario!.id, state, code);
+      req.log.info('conta do Mercado Pago conectada');
+      return voltar('conectado');
+    } catch (error) {
+      req.log.warn({ err: (error as Error).message }, 'falha ao conectar a conta do Mercado Pago');
+      return voltar('erro');
+    }
+  });
+
+  app.delete('/mercadopago', async (req, reply) => {
+    await mercadoPagoConta.desconectar();
+    req.log.info('conta do Mercado Pago desconectada');
+    return reply.code(204).send();
+  });
 }

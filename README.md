@@ -15,7 +15,7 @@ O site do nosso casamento: convite, confirmação de presença, lista de present
 ![Module Federation](https://img.shields.io/badge/Module_Federation-Rsbuild-ff5733)
 ![Fastify](https://img.shields.io/badge/Fastify-Node_24-000000?logo=fastify&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL_17-4169e1?logo=postgresql&logoColor=white)
-![Stripe](https://img.shields.io/badge/Stripe-Pix_e_cartão-635bff?logo=stripe&logoColor=white)
+![Mercado Pago](https://img.shields.io/badge/Mercado_Pago-Pix_e_cartão_em_12x-00b1ea?logo=mercadopago&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker_Compose-2496ed?logo=docker&logoColor=white)
 
 </div>
@@ -28,7 +28,7 @@ O site do nosso casamento: convite, confirmação de presença, lista de present
 | --- | --- | --- |
 | 🗺️ | **Abertura "Mapa do Maroto"**: o folheto se desdobra em sanfona, pegadas com fitas andam pelos corredores até a igreja | |
 | 💌 | **Confirmação de presença** pelo código ou QR Code do convite | Convidados, link de WhatsApp, QR Codes para imprimir |
-| 🎁 | **Lista de presentes** com carrinho, **Pix e cartão** pelo Stripe | Presentes e categorias com arrastar e soltar; recebidos com taxa real |
+| 🎁 | **Lista de presentes** com carrinho, **Pix e cartão em até 12x** pelo Mercado Pago | Presentes e categorias com arrastar e soltar; recebidos com taxa real |
 | 📷 | **Álbum de fotos retrô** que abre como um livro, com páginas virando | Envio de fotos, legendas, momentos e ordem |
 | 💬 | **Mural de recados** | Moderação dos recados |
 | 🚪 | **Check-in na portaria** com leitor de QR | |
@@ -41,7 +41,7 @@ O site do nosso casamento: convite, confirmação de presença, lista de present
 - [Começando em 5 minutos](#comecando)
 - [Como o projeto é organizado](#organizacao)
 - [Recursos em detalhe](#recursos)
-- [Pagamentos (Stripe)](#pagamentos)
+- [Pagamentos (Mercado Pago)](#pagamentos)
 - [E-mail](#email)
 - [Deploy](#deploy)
 - [Referência da API](#api)
@@ -104,7 +104,7 @@ flowchart LR
     S --> PA[painel :4005]
     S -- /api --> A[(API Fastify :4100)]
     A --> DB[(PostgreSQL :5433)]
-    A --> ST{{Stripe}}
+    A --> MP{{Mercado Pago}}
     A --> ML{{Servidor de e-mail}}
 ```
 
@@ -184,52 +184,45 @@ O site tem um único visual claro. Ele declara um "tema escuro" que é a mesma p
 
 <a id="pagamentos"></a>
 
-## 💳 Pagamentos (Stripe)
+## 💳 Pagamentos (Mercado Pago)
 
-O carrinho termina no **Stripe Checkout**:
+O carrinho termina no **Checkout Pro** do Mercado Pago, na conta que os noivos conectam no painel com um clique:
 
 ```mermaid
 sequenceDiagram
     participant C as Convidado
     participant S as Site
     participant A as API
-    participant St as Stripe
+    participant MP as Mercado Pago
     C->>S: escolhe presentes e clica em Pagar
     S->>A: POST /api/public/pedidos
     A->>A: recalcula valores pelo banco e reserva
-    A->>St: cria a Checkout Session
-    C->>St: paga (Pix ou cartão)
-    St-->>A: webhook (assinatura verificada)
+    A->>MP: cria a preferência (token da conta conectada)
+    C->>MP: paga (Pix ou cartão em até 12x)
+    MP-->>A: webhook → API busca o pagamento no Mercado Pago
     A->>A: pedido pago, recibo por e-mail
     C->>S: volta em /?pedido=… e vê o agradecimento
 ```
 
+- **Tudo pelo painel**, sem variáveis de ambiente nem secrets: em *Configurações*, o usuário master cadastra uma vez a aplicação do Mercado Pago (Client ID e Client Secret, conferidos com o Mercado Pago antes de salvar) e clica em **Conectar ao Mercado Pago**: entra no Mercado Pago, autoriza o site e volta (OAuth com PKCE).
+- A API guarda o client secret e os tokens da conta **cifrados** (AES-256-GCM, chave derivada da senha do banco, que não fica no banco) e renova a autorização sozinha um mês antes de vencer (ela dura 180 dias). Sem conta conectada, o site não aceita pagamentos. Trocar a senha do banco obriga a cadastrar a aplicação e conectar de novo.
 - **O navegador nunca define preço**: a API recalcula tudo pelo banco.
-- **Taxa embutida**: cada presente é cadastrado com o valor que os noivos querem receber; o site cobra esse valor **mais 5,99% + R$ 0,39** (cartão internacional, o caso mais caro; ajustável em Configurações). O preço é calculado de trás para frente, `(valor + fixo) / (1 − percentual)`, para sobrar exatamente o valor cadastrado. Regra única em `packages/shared/src/taxas.ts`, usada no site e na API.
-- **Presente único ou cota**: "Pode ser presenteado" 1 vez, quantas vezes quiserem (ex.: lua de mel) ou uma quantidade definida. A unidade fica reservada enquanto alguém paga (30 min) e a API trava a disponibilidade numa transação, então dois convidados não pagam o mesmo presente.
-- **Taxa real**: cada pedido pago guarda a forma de pagamento e a taxa real do Stripe (da *balance transaction*). O painel mostra bruto, taxa e líquido.
-- **Formas de pagamento** são ligadas no [Dashboard do Stripe](https://dashboard.stripe.com/settings/payment_methods), não no código. O Pix vale 4 horas.
+- **Taxa embutida**: cada presente é cadastrado com o valor que os noivos querem receber; o site cobra esse valor **mais 5,99% + R$ 0,39** (acima da taxa de cartão do Mercado Pago, 4,98%; Pix 0,99%; ajustável em Configurações). O preço é calculado de trás para frente, `(valor + fixo) / (1 − percentual)`, para sobrar exatamente o valor cadastrado. Regra única em `packages/shared/src/taxas.ts`, usada no site e na API.
+- **Parcelamento**: até 12x no cartão. Os juros ficam com o convidado, a não ser que a conta ofereça parcelas sem juros nas configurações do Mercado Pago.
+- **Presente único ou cota**: "Pode ser presenteado" 1 vez, quantas vezes quiserem (ex.: lua de mel) ou uma quantidade definida. A unidade fica reservada enquanto alguém paga (30 min; um Pix gerado vale 60 min) e a API trava a disponibilidade numa transação, então dois convidados não pagam o mesmo presente.
+- **Webhook** em `/api/mercadopago/webhook`, informado em cada pagamento (`notification_url`), então não há nada a configurar na aplicação. A notificação só diz "o pagamento X mudou"; a API sempre busca o pagamento no Mercado Pago com o token da conta, nunca confia no corpo.
+- **Taxa real**: cada pedido pago guarda a forma de pagamento e a taxa cobrada (`fee_details`). Estorno ou contestação deixa o pedido "estornado" e libera os presentes. Os pedidos antigos, pagos pelo Stripe, continuam no histórico.
 
 <details>
-<summary><b>Testar pagamentos em desenvolvimento</b></summary>
+<summary><b>Configurar o Mercado Pago (uma vez)</b></summary>
 
-1. Coloque a chave de **teste** (`sk_test_...`, em https://dashboard.stripe.com/test/apikeys) em `STRIPE_SECRET_KEY` no `.env`.
-2. Suba a Stripe CLI e copie o `whsec_...` que ela mostra:
-   ```bash
-   docker compose --profile stripe up -d stripe-cli
-   docker compose logs stripe-cli
-   ```
-3. Coloque o `whsec_...` em `STRIPE_WEBHOOK_SECRET` e recrie a API: `docker compose up -d api`.
-4. Teste:
-   - **Cartão:** `4242 4242 4242 4242`, qualquer validade futura e CVC.
-   - **Pix:** CPF `000.000.000-00` e *Simular digitalização*. O e-mail controla a simulação: `qualquer+succeed_immediately@exemplo.com` confirma na hora, `qualquer+expire_immediately@exemplo.com` expira, e um e-mail comum confirma em ~3 minutos.
+1. No painel, abra **Configurações → Recebimento dos presentes**. O cartão mostra os passos e a URL de retorno com um botão de copiar.
+2. Em https://www.mercadopago.com.br/developers/panel/app, clique em **Criar aplicação**: pagamentos on-line, produto **Checkout Pro**.
+3. Nos detalhes da aplicação, em **URLs de redirecionamento**, cadastre `https://casamentonayaraevictor.com.br/api/admin/mercadopago/retorno` e ative o **PKCE**.
+4. Em **Credenciais de produção**, copie o **Client ID** e o **Client Secret** para o painel e salve.
+5. Clique em **Conectar ao Mercado Pago** com a conta que vai receber.
 
-</details>
-
-<details>
-<summary><b>Stripe em produção</b></summary>
-
-Use a chave **live** e crie no Dashboard um webhook para `https://casamentonayaraevictor.com.br/api/stripe/webhook` com os eventos `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` e `checkout.session.expired`. A chave e o `whsec_...` vão nos secrets `STRIPE_SECRET_KEY` e `STRIPE_WEBHOOK_SECRET` do GitHub.
+**Teste:** em *Contas de teste*, crie um vendedor e um comprador. Conecte o vendedor no painel (aparece "Conta de teste") e pague logado com o comprador, usando os [cartões de teste](https://www.mercadopago.com.br/developers/pt/docs/checkout-pro/additional-content/your-integrations/test/cards) (titular `APRO` aprova, `OTHE` recusa). Em desenvolvimento, o redirecionamento do OAuth e o webhook precisam de uma URL pública (`SITE_URL`); a tela de volta consulta o pagamento direto no Mercado Pago.
 
 </details>
 
@@ -311,7 +304,6 @@ Em *Settings → Secrets and variables → Actions*. A cada deploy o job manda o
 | --- | --- | --- |
 | Secret | `VPS_SSH_KEY` | chave do deploy (presa ao `casamento-deploy`) |
 | Secret | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | login do dono do painel (usuário master) |
-| Secret | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe em modo real |
 | Variable | `ADMIN_NOME`, `EMAIL_FROM`, `EMAIL_REPLY_TO` | nome no painel e remetente dos e-mails |
 
 </details>
@@ -332,7 +324,7 @@ Em *Settings → Secrets and variables → Actions*. A cada deploy o job manda o
    ```
    A privada vai no secret `VPS_SSH_KEY`; crie também o ambiente `producao` em *Settings → Environments*.
 5. **Banco:** `cd /opt/casamento && docker compose -f compose.yaml -f compose.producao.yaml up -d --wait db`. O Traefik (`traefik-duis-traefik-1`, rede `host`) acha o container `web` pelos labels.
-6. **Painel e Stripe:** preencha os secrets; o deploy roda o seed sozinho.
+6. **Painel e Mercado Pago:** preencha os secrets; o deploy roda o seed sozinho. Depois configure o Mercado Pago no painel, em Configurações.
 
 </details>
 
@@ -358,7 +350,7 @@ Em *Settings → Secrets and variables → Actions*. A cada deploy o job manda o
 | `GET/POST /api/public/recados` | público | mural (POST limitado a 5/hora por IP) |
 | `GET /api/public/presentes` · `POST /api/public/pedidos` | público | lista e compra de presentes |
 | `GET /api/public/galeria` | público | fotos do álbum |
-| `POST /api/stripe/webhook` | Stripe | confirmação de pagamentos |
+| `POST /api/mercadopago/webhook` | Mercado Pago | confirmação de pagamentos |
 | `POST /api/auth/login` · `logout` · `GET me` | — | sessão do painel |
 | `/api/auth/convite/:token` · `recuperar-senha` · `redefinir/:token` | — | convites e recuperação de senha |
 | `/api/admin/*` | noivos | painel (alguns só para o master) |
@@ -371,7 +363,7 @@ Em *Settings → Secrets and variables → Actions*. A cada deploy o job manda o
 
 ## 💍 Antes do grande dia
 
-- [ ] Stripe em modo **live** com Pix e cartão ativos no Dashboard, e um pagamento real pequeno de teste
+- [ ] Conta do Mercado Pago conectada no painel (não "Conta de teste") e um pagamento real pequeno de teste
 - [ ] Reputação do e-mail em https://www.mail-tester.com
 - [ ] Fotos e legendas do álbum no painel
 - [ ] Convites com QR Code impressos (aba Convidados → **Imprimir QR Codes**)

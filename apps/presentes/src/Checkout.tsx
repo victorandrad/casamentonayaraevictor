@@ -25,7 +25,7 @@ const TEMPO_MINIMO_AVISO = 1800;
 const esperar = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Gift checkout: review the cart, tell us who is giving, check the order, then
-// `criarPagamento` creates the order on the API and we redirect to Stripe Checkout.
+// `criarPagamento` creates the order on the API and we redirect to Mercado Pago's payment page.
 export function Checkout({ itens, total, onQuantidade, onRemover, onFechar }: Props) {
   const [etapa, setEtapa] = useState<Etapa>('carrinho');
   const [convidado, setConvidado] = useState<Convidado>({ nome: '', email: '', mensagem: '' });
@@ -51,7 +51,7 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar }: Pr
     painel.current?.scrollTo({ top: 0 });
   }, [etapa]);
 
-  // Coming back from Stripe with the browser's back button restores this page
+  // Coming back from Mercado Pago with the browser's back button restores this page
   // from cache; drop the redirect screen so the guest can try again.
   useEffect(() => {
     const onPageShow = (e: PageTransitionEvent) => e.persisted && setEnviando(false);
@@ -84,7 +84,7 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar }: Pr
         }),
         esperar(TEMPO_MINIMO_AVISO),
       ]);
-      // The browser leaves for Stripe, so the redirect screen stays up.
+      // The browser leaves for Mercado Pago, so the redirect screen stays up.
       window.location.assign(url);
     } catch (error) {
       setAviso(errorMessage(error));
@@ -112,7 +112,7 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar }: Pr
             </span>
             <h2 className="checkout__redirect-title">Indo para o ambiente seguro</h2>
             <p className="checkout__redirect-text">
-              Estamos levando você para a página de pagamento do Stripe. Lá, seus dados são criptografados e protegidos;
+              Estamos levando você para a página de pagamento do Mercado Pago. Lá, seus dados são criptografados e protegidos;
               o site do casamento não tem acesso aos dados do seu cartão ou do seu Pix.
             </p>
             <span className="checkout__redirect-dots" aria-hidden>
@@ -121,7 +121,7 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar }: Pr
               <i />
             </span>
             <p className="checkout__redirect-seal">
-              <Icon name="lock" size={14} /> Conexão segura · Stripe, certificado PCI DSS nível 1
+              <Icon name="lock" size={14} /> Conexão segura · Mercado Pago, certificado PCI DSS nível 1
             </p>
           </div>
         )}
@@ -316,8 +316,8 @@ export function Checkout({ itens, total, onQuantidade, onRemover, onFechar }: Pr
               <div>
                 <strong>Pagamento em ambiente seguro</strong>
                 <p>
-                  Ao continuar, você será redirecionado para a página de pagamento do <b>Stripe</b>, onde pode pagar
-                  com Pix ou cartão. Seus dados de pagamento ficam protegidos com criptografia e não passam pelo nosso
+                  Ao continuar, você será redirecionado para a página de pagamento do <b>Mercado Pago</b>, onde pode pagar
+                  com Pix ou cartão em até 12x. Seus dados de pagamento ficam protegidos com criptografia e não passam pelo nosso
                   site nem ficam guardados conosco.
                 </p>
               </div>
