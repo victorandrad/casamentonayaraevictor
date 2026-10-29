@@ -190,7 +190,8 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
           </>
         )}
 
-        {status === 'pago' || status === 'aguardando' ? (
+        {/* The note on the wall only once the gift is really paid (not while a Pix waits). */}
+        {status === 'pago' ? (
           <>
             <button className="nv-btn nv-btn--block" onClick={irParaRecados}>
               Deixar um recado no mural
@@ -199,6 +200,10 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
               Voltar ao site
             </button>
           </>
+        ) : status === 'aguardando' ? (
+          <button className="checkout__link" onClick={onFechar}>
+            Voltar ao site
+          </button>
         ) : (
           <button className="nv-btn-outline retorno__ok" onClick={onFechar}>
             Fechar

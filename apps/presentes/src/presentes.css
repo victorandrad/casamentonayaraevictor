@@ -447,3 +447,30 @@
   .retorno--pix { padding: 22px 16px 16px; }
   .retorno--pix .retorno__qr { width: 180px; height: 180px; }
 }
+
+/* Desktop: the Pix screen in two columns (QR on the left, code and status on the right), so it fits
+   without scrolling; a thin scrollbar in the theme's colours when a short window still needs one. */
+.retorno,
+.checkout { scrollbar-width: thin; scrollbar-color: var(--nv-border-strong) transparent; }
+.retorno::-webkit-scrollbar,
+.checkout::-webkit-scrollbar { width: 6px; }
+.retorno::-webkit-scrollbar-thumb,
+.checkout::-webkit-scrollbar-thumb { background: var(--nv-border-strong); border-radius: 999px; }
+.retorno::-webkit-scrollbar-track,
+.checkout::-webkit-scrollbar-track { background: transparent; }
+@media (min-width: 760px) {
+  .retorno--pix { width: min(740px, 100%); padding: 30px 34px 24px; }
+  .retorno--pix .retorno__pix {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    column-gap: 28px;
+    row-gap: 12px;
+    align-items: start;
+    margin-top: 14px;
+    text-align: left;
+  }
+  .retorno--pix .retorno__qr { grid-column: 1; grid-row: 1 / span 5; width: 220px; height: 220px; }
+  .retorno--pix .retorno__pix > :not(.retorno__qr) { grid-column: 2; }
+  .retorno--pix .retorno__text { margin: 0; }
+  .retorno--pix .retorno__aguardando { margin: 0; }
+}
