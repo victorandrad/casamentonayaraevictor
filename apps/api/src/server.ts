@@ -5,6 +5,7 @@ import fastifyStatic from '@fastify/static';
 import { config } from './config.ts';
 import { pool } from './db.ts';
 import { conciliarPendentes } from './pedidos.ts';
+import { enviarAvisos } from './push.ts';
 import { migrate } from './migrate.ts';
 import { publicRoutes } from './routes/public.ts';
 import { authRoutes } from './routes/auth.ts';
@@ -74,6 +75,9 @@ await app.listen({ port: config.port, host: '0.0.0.0' });
 // Payments Mercado Pago didn't answer clearly get settled in the background.
 const conciliacao = setInterval(() => void conciliarPendentes().catch((error) => app.log.warn(error)), 2 * 60_000);
 conciliacao.unref();
+// Browser notices for guests paying (the Pix about to expire, the outcome).
+const avisos = setInterval(() => void enviarAvisos().catch((error) => app.log.warn(error)), 60_000);
+avisos.unref();
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, async () => {

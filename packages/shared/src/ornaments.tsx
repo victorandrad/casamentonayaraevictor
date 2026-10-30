@@ -59,6 +59,8 @@ const iconPaths = {
   plane: 'M21 3.5L3 10.5l6.5 2.5L21 3.5l-8.5 12.5V21l3-3.6 4 3.1z',
   search: 'M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.4 15.4L20 20',
   shield: 'M12 3l7 3v5.5c0 4.5-3 8-7 9.5-4-1.5-7-5-7-9.5V6zM9 12l2 2 4-4',
+  bell: 'M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0M12 3.5V5',
+  check: 'M5 12.5l4.5 4.5L19 7.5',
 } as const;
 
 export type IconName = keyof typeof iconPaths;

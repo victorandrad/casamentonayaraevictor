@@ -368,6 +368,12 @@
 .retorno--pix .retorno__qr { width: 200px; height: 200px; }
 .retorno--pix .checkout__summary { margin-top: 14px; }
 .retorno__nota { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--nv-muted); }
+/* "Avisar quando o pagamento for confirmado" (browser notices) */
+.retorno__avisos { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 14px 0 0; font-size: 13px; line-height: 1.5; color: var(--nv-muted); text-align: center; }
+.retorno__avisos-botao { display: inline-flex; align-items: center; gap: 8px; }
+.retorno__avisos--ativo { flex-direction: row; justify-content: center; color: var(--nv-ink); }
+.retorno__avisos--ativo svg { flex: none; color: var(--nv-rose, currentColor); }
+.retorno__avisos-erro { font-size: 12.5px; }
 @media (max-width: 480px) {
   .retorno--pix { padding: 22px 16px 16px; }
   .retorno--pix .retorno__qr { width: 180px; height: 180px; }

@@ -3,6 +3,7 @@ import type { PagamentoResultado, PedidoInput } from '@nv/shared/types';
 import { rateLimiter } from '../auth.ts';
 import { ContaNaoConectada, PagamentoRecusadoPeloMercadoPago } from '../mercadopago.ts';
 import { chavePublica } from '../mercadopagoConta.ts';
+import { chavePublicaPush, InscricaoInvalida, inscrever } from '../push.ts';
 import { abrirLink, criarLink, LinkExpirado, MAX_ITENS_LINK, type ItemLink } from '../linkCheckout.ts';
 import { MOTIVO_PADRAO, pagamentoDisponivel, pagar, PedidoInvalido, pedidoPorUid } from '../pedidos.ts';
 
@@ -21,6 +22,7 @@ const detalheLimiter = rateLimiter(2, HORA);
 const pixLimiter = rateLimiter(5, HORA);
 const SITE = 'site';
 const linkLimiter = rateLimiter(120, 60_000);
+const pushLimiter = rateLimiter(20, HORA);
 
 // CPF check digits (Mercado Pago also checks, but a typo is caught here with a clear message).
 function cpfValido(cpf: string): boolean {
@@ -209,6 +211,43 @@ export async function pedidosRoutes(app: FastifyInstance) {
       } catch (error) {
         if (error instanceof LinkExpirado) return reply.code(410).send({ erro: 'Este link de presentes expirou. Escolha os presentes de novo na lista.' });
         return reply.code(400).send({ erro: 'Este link de presentes não é válido. Escolha os presentes na lista.' });
+      }
+    },
+  );
+  // Browser notices about an open order (see push.ts).
+  app.get('/push/chave', async () => ({ chave: await chavePublicaPush() }));
+
+  app.post<{ Params: { pedido: string }; Body: { endpoint: string; keys: { p256dh: string; auth: string } } }>(
+    '/pedidos/:pedido/push',
+    {
+      schema: {
+        params: pedidoParams,
+        body: {
+          type: 'object',
+          required: ['endpoint', 'keys'],
+          properties: {
+            endpoint: { type: 'string', maxLength: 1000 },
+            keys: {
+              type: 'object',
+              required: ['p256dh', 'auth'],
+              properties: {
+                p256dh: { type: 'string', pattern: '^[A-Za-z0-9_=-]{40,200}$' },
+                auth: { type: 'string', pattern: '^[A-Za-z0-9_=-]{10,60}$' },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      if (pushLimiter.hit(req.ip)) return reply.code(429).send({ erro: 'Muitas tentativas seguidas. Aguarde um pouco.' });
+      try {
+        const inscrito = await inscrever(req.params.pedido, { endpoint: req.body.endpoint, keys: req.body.keys });
+        if (!inscrito) return reply.code(409).send({ erro: 'Este pedido já foi concluído.' });
+        return reply.code(204).send();
+      } catch (error) {
+        if (error instanceof InscricaoInvalida) return reply.code(400).send({ erro: 'Não foi possível ativar os avisos neste navegador.' });
+        throw error;
       }
     },
   );

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon, navegar, Ornament } from '@nv/shared';
 import { ApiError, errorMessage, formatBRL } from '@nv/shared/api';
 import type { PedidoPublico } from '@nv/shared/types';
+import { ativarAvisos, avisosAtivos, avisosBloqueados, avisosSuportados } from './avisos';
 import { consultarPedido, esquecerPedidoAberto } from './pagamento';
 
 // `uid`: the order's public UUID (from the address, /presentear/pedido/<uid>).
@@ -14,6 +15,42 @@ const INTERVALO_PENDENTE = 3000;
 const INTERVALO_PIX = 5000;
 const INTERVALO_PIX_DEPOIS = 15_000;
 const CONSULTAS_RAPIDAS = 24;
+
+// "Notify me": for a guest who leaves the page to pay in the bank's app. Only where the browser can.
+function BotaoAvisos({ uid, pix }: { uid: string; pix: boolean }) {
+  const [estado, setEstado] = useState<'inicial' | 'ativando' | 'ativo' | 'negado' | 'erro'>(() =>
+    avisosAtivos(uid) ? 'ativo' : avisosBloqueados() ? 'negado' : 'inicial',
+  );
+  if (!avisosSuportados()) return null;
+
+  const ativar = async () => {
+    setEstado('ativando');
+    try {
+      setEstado((await ativarAvisos(uid)) ? 'ativo' : 'negado');
+    } catch {
+      setEstado('erro');
+    }
+  };
+
+  if (estado === 'ativo') {
+    return (
+      <p className="retorno__avisos retorno__avisos--ativo" role="status">
+        <Icon name="check" size={16} /> Pronto! Avisaremos neste aparelho{pix ? ' antes de o Pix vencer e' : ''} quando o pagamento for confirmado.
+      </p>
+    );
+  }
+  if (estado === 'negado') {
+    return <p className="retorno__avisos">As notificações deste site estão bloqueadas no navegador. O aviso chega por e-mail.</p>;
+  }
+  return (
+    <div className="retorno__avisos">
+      <button className="nv-btn-outline retorno__avisos-botao" onClick={ativar} disabled={estado === 'ativando'}>
+        <Icon name="bell" size={16} /> {estado === 'ativando' ? 'Ativando…' : 'Avisar quando for confirmado'}
+      </button>
+      {estado === 'erro' && <span className="retorno__avisos-erro">Não deu para ativar agora. O aviso chega por e-mail.</span>}
+    </div>
+  );
+}
 
 const horario = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
@@ -153,6 +190,7 @@ export function Pedido({ uid, onConcluido }: Props) {
                   {pix.expiraEm ? `Pague até ${horario(pix.expiraEm)}: depois disso o Pix vence, nada é cobrado e o presente volta para a lista.` : 'Se o Pix vencer sem pagamento, nada é cobrado e o presente volta para a lista.'}{' '}
                   Enviamos o QR Code e o código também para o seu e-mail.
                 </p>
+                <BotaoAvisos uid={uid} pix />
               </div>
             )}
             {pixVencido && (
@@ -162,9 +200,12 @@ export function Pedido({ uid, onConcluido }: Props) {
               </p>
             )}
             {status === 'aguardando' && !pix && !pixVencido && (
-              <p className="retorno__text">
-                Recebemos seu pedido. Assim que o pagamento for confirmado pelo banco, o presente chega para nós.
-              </p>
+              <>
+                <p className="retorno__text">
+                  Recebemos seu pedido. Assim que o pagamento for confirmado pelo banco, o presente chega para nós.
+                </p>
+                <BotaoAvisos uid={uid} pix={false} />
+              </>
             )}
             {(status === 'falhou' || status === 'expirado' || status === 'estornado') && (
               <p className="retorno__text">
@@ -178,6 +219,7 @@ export function Pedido({ uid, onConcluido }: Props) {
                   : 'Estamos aguardando a confirmação do pagamento. Isso leva só alguns segundos.'}
               </p>
             )}
+            {status === 'pendente' && desistiu && <BotaoAvisos uid={uid} pix={false} />}
 
             {pedido && pedido.itens.length > 0 && (
               <ul className="checkout__summary">

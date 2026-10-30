@@ -7,6 +7,7 @@ import { getTaxa, PRESENTE_SELECT, toPresente } from './repo.ts';
 import { enviarPix, enviarRecibo } from './email.ts';
 import * as mercadoPago from './mercadopago.ts';
 import { chavePublica } from './mercadopagoConta.ts';
+import { enviarAvisos } from './push.ts';
 
 // Whether gifts can be paid right now: a Mercado Pago account is connected in the panel (with the
 // public key the payment form needs).
@@ -243,6 +244,8 @@ export async function pagar(input: PedidoInput): Promise<PagamentoResultado> {
 export async function aplicarPagamentoMercadoPago(pagamento: Parameters<typeof mercadoPago.sincronizarPagamento>[0]) {
   const pagoAgora = await mercadoPago.sincronizarPagamento(pagamento);
   if (pagoAgora) void enviarReciboDoPedido(pagoAgora);
+  // A guest who asked for notices hears about the outcome now, not on the next round.
+  void enviarAvisos().catch((error) => console.warn('falha ao enviar avisos:', (error as Error).message));
 }
 
 // Used by the thank-you screen. The order's UUID is unguessable, so it works as the guest's
