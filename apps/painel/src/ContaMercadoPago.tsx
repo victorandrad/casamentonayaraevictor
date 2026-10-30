@@ -248,6 +248,7 @@ export function ContaMercadoPago() {
   const [desconectando, setDesconectando] = useState(false);
   const [trocandoAplicacao, setTrocandoAplicacao] = useState(false);
   const [usandoCredenciais, setUsandoCredenciais] = useState(false);
+  const [removendoAplicacao, setRemovendoAplicacao] = useState(false);
 
   // Coming back from Mercado Pago: drop ?mercadopago from the URL so a reload doesn't repeat the note.
   useEffect(() => {
@@ -272,22 +273,25 @@ export function ContaMercadoPago() {
 
   const conta = data?.conta;
   const aviso = resultado ? RESULTADOS[resultado] : null;
-  const editandoAplicacao = data && !usandoCredenciais && (trocandoAplicacao || (!data.aplicacao && !conta));
+  // The application (Client ID/Secret) is only for the optional OAuth button: its form opens on request.
+  const editandoAplicacao = data && !usandoCredenciais && trocandoAplicacao;
 
-  const linkCredenciais = (
+  const linhaAplicacao = data?.aplicacao ? (
     <p className="painel-mp__aplicacao">
-      Para testar, ou sem conectar pelo botão:{' '}
-      <button className="painel-link" onClick={() => setUsandoCredenciais(true)}>
-        usar a Public Key e o Access Token da aplicação
-      </button>
-    </p>
-  );
-
-  const linhaAplicacao = data?.aplicacao && (
-    <p className="painel-mp__aplicacao">
-      Aplicação do Mercado Pago: Client ID <code>{data.aplicacao.clientId}</code> ·{' '}
+      Login do Mercado Pago (OAuth): aplicação com Client ID <code>{data.aplicacao.clientId}</code> ·{' '}
       <button className="painel-link" onClick={() => setTrocandoAplicacao(true)}>
         Alterar
+      </button>{' '}
+      ·{' '}
+      <button className="painel-link painel-link--danger" onClick={() => setRemovendoAplicacao(true)}>
+        Remover
+      </button>
+    </p>
+  ) : (
+    <p className="painel-mp__aplicacao">
+      Conectar com o login do Mercado Pago, sem copiar chaves:{' '}
+      <button className="painel-link" onClick={() => setTrocandoAplicacao(true)}>
+        Cadastrar a aplicação (OAuth)
       </button>
     </p>
   );
@@ -326,24 +330,48 @@ export function ContaMercadoPago() {
             setTrocandoAplicacao(false);
             setResultado(null);
           }}
-          onCancelar={data.aplicacao ? () => setTrocandoAplicacao(false) : undefined}
+          onCancelar={() => setTrocandoAplicacao(false)}
         />
       )}
-      {editandoAplicacao && !data.aplicacao && linkCredenciais}
 
       {data && !editandoAplicacao && !usandoCredenciais && !conta && (
         <>
-          <p className="painel-hint">
-            Os convidados pagam com <strong>Pix</strong> ou <strong>cartão em até 12x</strong> no ambiente seguro do Mercado
-            Pago, e o valor cai direto na conta de vocês. Conecte a conta que vai receber: vocês entram no Mercado Pago,
-            autorizam o site e voltam para cá. Nenhuma senha fica com o site.
-          </p>
-          <p className="painel-mp__aviso">Enquanto nenhuma conta estiver conectada, o site não aceita pagamentos.</p>
-          <button className="nv-btn painel-mp__botao" onClick={conectar} disabled={indo}>
-            {indo ? 'Abrindo o Mercado Pago…' : 'Conectar ao Mercado Pago'}
-          </button>
+          {data.aplicacao ? (
+            <>
+              {/* One click: the couple logs in on Mercado Pago and authorizes; the account's Access Token and
+                  Public Key come back from Mercado Pago, nothing to copy. */}
+              <p className="painel-hint">
+                Os convidados pagam com <strong>Pix</strong> ou <strong>cartão em até 12x</strong> dentro do site, pelo
+                Mercado Pago, e o valor cai direto na conta de vocês. Conecte a conta que vai receber: vocês entram no
+                Mercado Pago, autorizam o site e voltam para cá. As chaves da conta vêm sozinhas; nenhuma senha fica com o site.
+              </p>
+              <p className="painel-mp__aviso">Enquanto nenhuma conta estiver conectada, o site não aceita pagamentos.</p>
+              <div className="painel-mp__acoes">
+                <button className="nv-btn painel-mp__botao" onClick={conectar} disabled={indo}>
+                  {indo ? 'Abrindo o Mercado Pago…' : 'Conectar ao Mercado Pago'}
+                </button>
+                <button className="nv-btn-ghost" onClick={() => setUsandoCredenciais(true)}>
+                  Colar Public Key e Access Token
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="painel-hint">
+                Os convidados pagam com <strong>Pix</strong> ou <strong>cartão em até 12x</strong> dentro do site, pelo
+                Mercado Pago, e o valor cai direto na conta de vocês. Para receber, conecte a conta com a{' '}
+                <strong>Public Key</strong> e o <strong>Access Token</strong> das credenciais de produção da aplicação, ou
+                cadastre a aplicação para conectar com o login do Mercado Pago, sem copiar chaves.
+              </p>
+              <p className="painel-mp__aviso">Enquanto nenhuma conta estiver conectada, o site não aceita pagamentos.</p>
+              <div className="painel-mp__acoes">
+                <button className="nv-btn painel-mp__botao" onClick={() => setUsandoCredenciais(true)}>
+                  Conectar com Public Key e Access Token
+                </button>
+              </div>
+            </>
+          )}
           {linhaAplicacao}
-          {linkCredenciais}
         </>
       )}
 
@@ -407,6 +435,23 @@ export function ContaMercadoPago() {
             {data.ultimoErro.mensagem && <> · {data.ultimoErro.mensagem}</>}
           </p>
         </details>
+      )}
+
+      {removendoAplicacao && (
+        <ConfirmarModal
+          titulo="Remover a aplicação do Mercado Pago"
+          mensagem={
+            <>
+              Apagar o Client ID e o Client Secret salvos? Eles só servem para o login do Mercado Pago (OAuth).
+              {conta?.origem === 'oauth'
+                ? ' A conta conectada por esse login também é desconectada, e o site para de aceitar pagamentos até uma conta ser conectada de novo.'
+                : ' A conta ligada pelas credenciais coladas continua funcionando.'}
+            </>
+          }
+          confirmar="Remover"
+          onConfirmar={async () => setData(await adminApi<Situacao>('/admin/mercadopago/aplicacao', { method: 'DELETE' }))}
+          onFechar={() => setRemovendoAplicacao(false)}
+        />
       )}
 
       {desconectando && (

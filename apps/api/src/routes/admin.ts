@@ -548,4 +548,10 @@ export async function adminRoutes(app: FastifyInstance) {
     req.log.info('conta do Mercado Pago desconectada');
     return reply.code(204).send();
   });
+
+  app.delete('/mercadopago/aplicacao', async (req) => {
+    await mercadoPagoConta.removerAplicacao();
+    req.log.info('aplicação do Mercado Pago removida');
+    return mercadoPagoConta.situacao();
+  });
 }

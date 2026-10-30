@@ -218,6 +218,14 @@ export async function desconectar(): Promise<void> {
   await query('DELETE FROM mercadopago_conta');
 }
 
+// Forgets the application (Client ID and Secret), for those who only use pasted credentials. An
+// account connected through it (OAuth) goes too: without the application its token can't be renewed.
+export async function removerAplicacao(): Promise<void> {
+  await query("DELETE FROM mercadopago_conta WHERE origem = 'oauth'");
+  await query('DELETE FROM mercadopago_oauth');
+  await query('DELETE FROM mercadopago_aplicacao');
+}
+
 type ContaRow = {
   usuario_mp: string;
   apelido: string | null;
