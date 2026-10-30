@@ -82,6 +82,9 @@ export default defineConfig({
       // Declares a dark theme (the same light palette, see theme.css) so forced dark modes —
       // Samsung Internet, Chrome auto-dark — leave the page alone; "only light" is ignored by Samsung.
       'color-scheme': 'light dark',
+      // Stops iPhone Safari from turning the date, time and address into links of its own (Maps,
+      // Calendar): the site already has its own buttons for those.
+      'format-detection': 'telephone=no, date=no, address=no, email=no',
     },
     // Icons live in public/ (copied to the site root as-is). Rsbuild already
     // links public/favicon.svg on its own; these are the fallbacks and app icons.
