@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { ICONES_CATEGORIA } from '@nv/shared/categorias';
 import { IDS_MOMENTOS } from '@nv/shared/galeria';
-import type { AplicacaoMercadoPagoInput, CategoriaInput, CredenciaisMercadoPagoInput, Configuracoes, ConvidadoInput, FotoGaleriaInput, OrganizacaoLista, PresenteInput } from '@nv/shared/types';
+import type { AplicacaoMercadoPagoInput, CategoriaInput, CredenciaisMercadoPagoInput, Configuracoes, ConvidadoInput, FotoGaleriaInput, FotosConvidadosAdmin, ModoFotosConvidados, OrganizacaoLista, PresenteInput } from '@nv/shared/types';
 import { destroyOtherSessions, requireAuth, requireOwner, SESSION_COOKIE } from '../auth.ts';
 import * as repo from '../repo.ts';
 import { enviarReciboDoPedido, listarPedidos } from '../pedidos.ts';
@@ -13,6 +13,15 @@ import { gerarZip } from '../zip.ts';
 import { rotuloMomento } from '@nv/shared/galeria';
 import { Readable } from 'node:stream';
 import * as usuarios from '../usuarios.ts';
+import {
+  arquivosParaBaixar,
+  envioAberto,
+  excluirFotoConvidado,
+  listarFotosConvidadosAdmin,
+  modoFotosConvidados,
+  definirModoFotosConvidados,
+  mostrarFotoConvidado,
+} from '../fotosConvidados.ts';
 
 const idParams = {
   type: 'object',
@@ -322,6 +331,52 @@ export async function adminRoutes(app: FastifyInstance) {
     await removerImagem(url);
     return reply.code(204).send();
   });
+
+  // Fotos e vídeos dos convidados (página /fotos)
+  const lerFotosConvidados = async (): Promise<FotosConvidadosAdmin> => ({
+    modo: await modoFotosConvidados(),
+    aberto: (await envioAberto()).aberto,
+    itens: await listarFotosConvidadosAdmin(),
+  });
+  app.get('/fotos-convidados', lerFotosConvidados);
+
+  app.put<{ Body: { modo: ModoFotosConvidados } }>(
+    '/fotos-convidados/modo',
+    {
+      schema: {
+        body: { type: 'object', required: ['modo'], additionalProperties: false, properties: { modo: { enum: ['automatico', 'aberto', 'fechado'] } } },
+      },
+    },
+    async (req) => {
+      await definirModoFotosConvidados(req.body.modo);
+      return lerFotosConvidados();
+    },
+  );
+
+  // Everything shown on the site, in the order it arrived, as JPG and MP4.
+  app.get('/fotos-convidados/todas.zip', async (req, reply) => {
+    const arquivos = await arquivosParaBaixar();
+    req.log.info({ arquivos: arquivos.length }, 'fotos dos convidados baixadas');
+    return reply
+      .header('Content-Type', 'application/zip')
+      .header('Content-Disposition', 'attachment; filename="fotos-dos-convidados.zip"')
+      .send(Readable.from(gerarZip(arquivos)));
+  });
+
+  app.patch<{ Params: { id: number }; Body: { visivel: boolean } }>(
+    '/fotos-convidados/:id',
+    {
+      schema: {
+        params: idParams,
+        body: { type: 'object', required: ['visivel'], additionalProperties: false, properties: { visivel: { type: 'boolean' } } },
+      },
+    },
+    async (req, reply) => (await mostrarFotoConvidado(req.params.id, req.body.visivel)) ?? reply.code(404).send(notFound),
+  );
+
+  app.delete<{ Params: { id: number } }>('/fotos-convidados/:id', { schema: { params: idParams } }, async (req, reply) =>
+    (await excluirFotoConvidado({ id: req.params.id })) ? reply.code(204).send() : reply.code(404).send(notFound),
+  );
 
   // Categorias da lista de presentes
   app.get('/categorias', async () => repo.listCategorias());

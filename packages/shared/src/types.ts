@@ -171,3 +171,32 @@ export type AvisoCsp = { diretiva: string; bloqueado: string; pagina: string; qu
 export type AvisosCsp = { desde: string; avisos: AvisoCsp[] };
 
 export type ApiErro = { erro: string };
+
+// Photos and videos the guests send from their phones (page /fotos).
+// `url`: the photo (JPG) or the video (MP4); `miniatura`: a small WebP (the video's cover).
+export type MidiaConvidado = {
+  uid: string;
+  tipo: 'foto' | 'video';
+  url: string;
+  miniatura: string;
+  largura: number;
+  altura: number;
+  duracao: number | null; // seconds, videos only
+  nome: string;
+  criadoEm: string;
+};
+// Whether guests can send: 'automatico' opens on the wedding day.
+export type ModoFotosConvidados = 'automatico' | 'aberto' | 'fechado';
+export type FotosConvidados = { aberto: boolean; abreEm: string | null; itens: MidiaConvidado[]; proxima: string | null };
+export type MidiaConvidadoAdmin = Omit<MidiaConvidado, 'url' | 'miniatura'> & {
+  id: number;
+  url: string | null;
+  miniatura: string | null;
+  estado: 'processando' | 'pronto' | 'falhou';
+  visivel: boolean;
+  bytes: number;
+};
+export type FotosConvidadosAdmin = { modo: ModoFotosConvidados; aberto: boolean; itens: MidiaConvidadoAdmin[] };
+// One file being sent in parts: start it, send the bytes in order, then finish it.
+export type EnvioMidia = { envio: string; parte: number };
+export type MidiaEnviada = { uid: string; tipo: 'foto' | 'video'; estado: 'processando' | 'pronto' };

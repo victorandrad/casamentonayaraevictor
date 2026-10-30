@@ -19,6 +19,8 @@ const Presentes = lazy(() => import('presentes/Presentes'));
 const Presentear = lazy(() => import('presentes/Presentear'));
 const Galeria = lazy(() => import('mural/Galeria'));
 const Recados = lazy(() => import('mural/Recados'));
+const FotosConvidados = lazy(() => import('mural/FotosConvidados'));
+const PreviaFotosConvidados = lazy(() => import('mural/PreviaFotosConvidados'));
 const Painel = lazy(() => import('painel/Painel'));
 
 const MAPA_VISTO = 'nv_mapa_visto';
@@ -64,6 +66,16 @@ export function App() {
     );
   }
 
+  // Guests' photos from the party (QR code on the tables): its own page, like the checkout.
+  if (caminho === '/fotos') {
+    return (
+      <>
+        <RemoteSlot name="mural/FotosConvidados" component={FotosConvidados} />
+        <AvisoCookies />
+      </>
+    );
+  }
+
   const fecharMapa = () => {
     try {
       localStorage.setItem(MAPA_VISTO, '1');
@@ -90,6 +102,7 @@ export function App() {
         <RemoteSlot name="rsvp/Rsvp" component={Rsvp} />
         <RemoteSlot name="presentes/Presentes" component={Presentes} />
         <RemoteSlot name="mural/Galeria" component={Galeria} />
+        <RemoteSlot name="mural/PreviaFotosConvidados" component={PreviaFotosConvidados} />
         <RemoteSlot name="evento/Traje" component={Traje} />
         <RemoteSlot name="mural/Recados" component={Recados} />
         <RemoteSlot name="evento/Local" component={Local} />

@@ -4,6 +4,9 @@ FROM node:24-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 
+# ffmpeg converte os vídeos que os convidados enviam (MP4 que toca em qualquer aparelho).
+RUN apk add --no-cache ffmpeg
+
 # Instala só as dependências de produção da API (workspace @nv/api).
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json

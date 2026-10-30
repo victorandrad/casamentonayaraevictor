@@ -10,4 +10,6 @@ declare module 'presentes/Presentes' { const C: RemoteComponent; export default 
 declare module 'presentes/Presentear' { const C: RemoteComponent; export default C; }
 declare module 'mural/Galeria' { const C: RemoteComponent; export default C; }
 declare module 'mural/Recados' { const C: RemoteComponent; export default C; }
+declare module 'mural/FotosConvidados' { const C: RemoteComponent; export default C; }
+declare module 'mural/PreviaFotosConvidados' { const C: RemoteComponent; export default C; }
 declare module 'painel/Painel' { const C: RemoteComponent; export default C; }

@@ -18,7 +18,7 @@ export function qrSvg(texto: string, margem = 2) {
 }
 
 // High-resolution PNG (good for print shops), drawn module by module.
-function baixarPng(texto: string, nomeArquivo: string) {
+export function baixarPng(texto: string, nomeArquivo: string) {
   const qr = gerarQr(texto);
   const modulos = qr.getModuleCount();
   const margem = 4;

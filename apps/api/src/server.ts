@@ -13,6 +13,8 @@ import { adminRoutes } from './routes/admin.ts';
 import { pedidosRoutes } from './routes/pedidos.ts';
 import { mercadoPagoWebhookRoutes } from './routes/mercadopago.ts';
 import { cspRoutes } from './routes/csp.ts';
+import { fotosConvidadosRoutes } from './routes/fotosConvidados.ts';
+import { converterVideos, garantirPastasFotosConvidados, limparFila } from './fotosConvidados.ts';
 import { garantirPastaUploads, MAX_UPLOAD_BYTES, UPLOADS_PREFIX } from './uploads.ts';
 
 const app = Fastify({
@@ -29,6 +31,7 @@ await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, 
 
 // Uploaded photos have random, never-reused names, so they can be cached forever.
 await garantirPastaUploads();
+await garantirPastasFotosConvidados();
 await app.register(fastifyStatic, {
   root: config.uploadsDir,
   prefix: UPLOADS_PREFIX,
@@ -64,6 +67,7 @@ app.get('/api/health', async () => {
 });
 await app.register(publicRoutes, { prefix: '/api/public' });
 await app.register(pedidosRoutes, { prefix: '/api/public' });
+await app.register(fotosConvidadosRoutes, { prefix: '/api/public' });
 await app.register(mercadoPagoWebhookRoutes, { prefix: '/api/mercadopago' });
 await app.register(cspRoutes, { prefix: '/api' });
 await app.register(authRoutes, { prefix: '/api/auth' });
@@ -78,6 +82,11 @@ conciliacao.unref();
 // Browser notices for guests paying (the Pix about to expire, the outcome).
 const avisos = setInterval(() => void enviarAvisos().catch((error) => app.log.warn(error)), 60_000);
 avisos.unref();
+// Guests' videos waiting to be converted (also what a restart interrupted).
+await limparFila().catch((error) => app.log.warn(error));
+void converterVideos().catch((error) => app.log.warn(error));
+const videos = setInterval(() => void converterVideos().catch((error) => app.log.warn(error)), 60_000);
+videos.unref();
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, async () => {

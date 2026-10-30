@@ -61,6 +61,9 @@ const iconPaths = {
   shield: 'M12 3l7 3v5.5c0 4.5-3 8-7 9.5-4-1.5-7-5-7-9.5V6zM9 12l2 2 4-4',
   bell: 'M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0M12 3.5V5',
   check: 'M5 12.5l4.5 4.5L19 7.5',
+  play: 'M8.5 5.5v13l10-6.5z',
+  upload: 'M12 15.5V4.5M7.5 9L12 4.5 16.5 9M4.5 15v4.5h15V15',
+  images: 'M8 8h12v11H8zM4.5 5H16M4.5 5v11M8 16.5l3.5-3.5 2.5 2.5 2-2 4 4',
 } as const;
 
 export type IconName = keyof typeof iconPaths;
