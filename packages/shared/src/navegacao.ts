@@ -6,12 +6,14 @@ import { useEffect, useState } from 'react';
 // event, the same one the browser's back/forward buttons fire.
 const NAVEGOU = 'nv:navegou';
 
-export function navegar(destino: string, { substituir = false } = {}) {
+// `rolar: false` only rewrites the address (e.g. the checkout's link after the cart changed).
+export function navegar(destino: string, { substituir = false, rolar = true } = {}) {
   const url = new URL(destino, location.href);
   if (substituir) history.replaceState(null, '', url);
   else history.pushState(null, '', url);
   window.dispatchEvent(new Event(NAVEGOU));
   // A new page starts at the top, or at the section the address points to (/#presentes).
+  if (!rolar) return;
   if (url.hash) rolarAte(url.hash.slice(1));
   else window.scrollTo({ top: 0, behavior: 'instant' });
 }
@@ -24,9 +26,14 @@ function rolarAte(id: string, tentativas = 30) {
 }
 
 export function useCaminho(): string {
-  const [caminho, setCaminho] = useState(() => location.pathname);
+  return useEndereco().caminho;
+}
+
+// The path and the query string (?c=… on the checkout), updated on every navigation.
+export function useEndereco(): { caminho: string; busca: URLSearchParams } {
+  const [endereco, setEndereco] = useState(() => location.pathname + location.search);
   useEffect(() => {
-    const aoMudar = () => setCaminho(location.pathname);
+    const aoMudar = () => setEndereco(location.pathname + location.search);
     window.addEventListener('popstate', aoMudar);
     window.addEventListener(NAVEGOU, aoMudar);
     return () => {
@@ -34,5 +41,6 @@ export function useCaminho(): string {
       window.removeEventListener(NAVEGOU, aoMudar);
     };
   }, []);
-  return caminho;
+  const [caminho, busca = ''] = endereco.split('?');
+  return { caminho, busca: new URLSearchParams(busca) };
 }

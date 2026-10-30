@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Icon, navegar, useCaminho } from '@nv/shared';
+import { Icon, navegar, useEndereco } from '@nv/shared';
 import { errorMessage, formatBRL } from '@nv/shared/api';
 import type { PedidoInput } from '@nv/shared/types';
 import { MAX_QUANTIDADE, useCarrinho } from './carrinho';
+import { abrirLink, chaveDoCarrinho, criarLink, PARAMETRO_LINK } from './linkCheckout';
 import { buscarLista } from './lista';
 import { configPagamento, lembrarPedidoAberto, pagar, type Convidado } from './pagamento';
 import { PagamentoBrick } from './PagamentoBrick';
@@ -15,6 +16,9 @@ import './presentes.css';
 //   /presentear/dados        who is giving
 //   /presentear/pagamento    Mercado Pago's payment form
 //   /presentear/pedido/<id>  thank-you, or the Pix to pay
+// The first three carry the cart in the address, encrypted by the API (?c=<link>, see linkCheckout.ts),
+// so a reload, another device or a link sent to someone opens the same gifts. Only gifts and amounts:
+// the guest's name, e-mail and CPF never go in the address.
 const BASE = '/presentear';
 type Etapa = 'carrinho' | 'dados' | 'pagamento';
 const ETAPAS: Array<[Etapa, string, string]> = [
@@ -62,7 +66,9 @@ const formatarCpf = (texto: string) =>
 const dadosCompletos = (c: Convidado) => !!c.nome.trim() && emailValido(c.email) && soDigitos(c.cpf).length === 11;
 
 export default function Presentear() {
-  const caminho = useCaminho().replace(/\/+$/, '');
+  const endereco = useEndereco();
+  const caminho = endereco.caminho.replace(/\/+$/, '');
+  const link = endereco.busca.get(PARAMETRO_LINK);
   const resto = caminho.slice(BASE.length).replace(/^\//, '');
   const pedidoUid = resto.startsWith('pedido/') ? resto.slice('pedido/'.length) : null;
   const etapa: Etapa = resto === 'dados' ? 'dados' : resto === 'pagamento' ? 'pagamento' : 'carrinho';
@@ -72,6 +78,8 @@ export default function Presentear() {
   const [convidado, setConvidadoEstado] = useState<Convidado>(lerRascunho);
   const [erroDados, setErroDados] = useState('');
   const [aviso, setAviso] = useState('');
+  // A link that couldn't be opened (expired, altered): stays on screen across the redirects.
+  const [avisoLink, setAvisoLink] = useState('');
   const [publicKey, setPublicKey] = useState<string | null>(null);
   // Set once this visit created an order: the cart is cleared only then (not for an older Pix reopened).
   const pedidoNovo = useRef<string | null>(null);
@@ -82,22 +90,76 @@ export default function Presentear() {
     guardarRascunho(c);
   };
 
-  // Names, prices and availability always come fresh from the API (the cart only keeps ids and amounts).
+  // Moving between steps keeps the cart's link in the address.
+  const ir = (destino: string, opcoes?: { substituir?: boolean }) =>
+    navegar(link ? `${destino}?${PARAMETRO_LINK}=${encodeURIComponent(link)}` : destino, opcoes);
+
+  // The link in the address when the checkout opens (a ref, so writing a new link doesn't reload the list).
+  const linkAtual = useRef(link);
+  linkAtual.current = link;
+  // Which cart the address's link holds, to make a new one only when the guest changes the cart.
+  const chaveDoLink = useRef<string | null>(null);
+
+  // A link in the address replaces the cart; then names, prices and availability come fresh from the
+  // API (the cart only keeps ids and amounts).
   const noCheckout = pedidoUid === null;
   const despachar = carrinho.dispatch;
   useEffect(() => {
     if (!noCheckout) return;
-    buscarLista()
-      .then((lista) => despachar({ tipo: 'sincronizar', presentes: lista.presentes }))
-      .catch((error) => setAviso(errorMessage(error)))
-      .finally(() => setListaCarregada(true));
+    let ativo = true;
+    (async () => {
+      const recebido = linkAtual.current;
+      if (recebido && chaveDoLink.current === null) {
+        try {
+          const itens = await abrirLink(recebido);
+          if (!ativo) return;
+          chaveDoLink.current = chaveDoCarrinho(itens);
+          despachar({ tipo: 'substituir', itens });
+        } catch (error) {
+          if (ativo) setAvisoLink(errorMessage(error));
+        }
+      }
+      const lista = await buscarLista();
+      if (ativo) despachar({ tipo: 'sincronizar', presentes: lista.presentes });
+    })()
+      .catch((error) => ativo && setAviso(errorMessage(error)))
+      .finally(() => ativo && setListaCarregada(true));
+    return () => {
+      ativo = false;
+    };
   }, [noCheckout, despachar]);
+
+  // The cart changed (or came without a link): a new link replaces the one in the address, without
+  // a new history entry. Waits for the guest to stop clicking + and −.
+  const chave = chaveDoCarrinho(carrinho.itens);
+  const itensAtuais = useRef(carrinho.itens);
+  itensAtuais.current = carrinho.itens;
+  useEffect(() => {
+    if (!noCheckout || !listaCarregada || !chave) return;
+    if (chave === chaveDoLink.current && linkAtual.current) return;
+    const espera = setTimeout(() => {
+      criarLink(itensAtuais.current)
+        .then(({ link: novo }) => {
+          chaveDoLink.current = chave;
+          // The guest may have left the checkout meanwhile (paid, or back to the site).
+          if (!location.pathname.startsWith(BASE) || location.pathname.includes('/pedido/')) return;
+          const url = new URL(location.href);
+          url.searchParams.set(PARAMETRO_LINK, novo);
+          navegar(url.pathname + url.search, { substituir: true, rolar: false });
+        })
+        .catch(() => {
+          // without a link the checkout still works; the address just doesn't carry the cart
+        });
+    }, 400);
+    return () => clearTimeout(espera);
+  }, [noCheckout, listaCarregada, chave]);
 
   // A step that needs what came before (e.g. the payment page reloaded, so the CPF is gone) goes back to it.
   useEffect(() => {
     if (pedidoUid) return;
     if (etapa !== 'carrinho' && listaCarregada && carrinho.itens.length === 0) navegar(BASE, { substituir: true });
-    else if (etapa === 'pagamento' && !dadosCompletos(convidado)) navegar(`${BASE}/dados`, { substituir: true });
+    else if (etapa === 'pagamento' && !dadosCompletos(convidado)) ir(`${BASE}/dados`, { substituir: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `ir` only reads the current link
   }, [etapa, pedidoUid, listaCarregada, carrinho.itens.length, convidado]);
 
   // Each page starts with focus on its title, for keyboard and screen-reader users.
@@ -120,7 +182,7 @@ export default function Presentear() {
     if (!emailValido(convidado.email)) return setErroDados('Informe um e-mail válido para receber o comprovante.');
     if (soDigitos(convidado.cpf).length !== 11) return setErroDados('Informe seu CPF: o Mercado Pago pede para qualquer pagamento.');
     setErroDados('');
-    navegar(`${BASE}/pagamento`);
+    ir(`${BASE}/pagamento`);
   };
 
   // Called by Mercado Pago's form. Throwing keeps the guest on the form to try again.
@@ -202,6 +264,11 @@ export default function Presentear() {
             <h1 className="presentear__titulo" tabIndex={-1} ref={titulo}>
               Seus presentes
             </h1>
+            {avisoLink && (
+              <p className="checkout__alert" role="alert">
+                {avisoLink}
+              </p>
+            )}
             {!listaCarregada && <p className="checkout__hint">Carregando…</p>}
             {listaCarregada && carrinho.itens.length === 0 ? (
               <div className="checkout__empty">
@@ -249,7 +316,7 @@ export default function Presentear() {
                     <span>Total</span>
                     <strong>{formatBRL(carrinho.total)}</strong>
                   </div>
-                  <button className="nv-btn nv-btn--block" onClick={() => navegar(`${BASE}/dados`)}>
+                  <button className="nv-btn nv-btn--block" onClick={() => ir(`${BASE}/dados`)}>
                     Continuar
                   </button>
                   <button className="checkout__link" onClick={voltarALista}>
@@ -326,7 +393,7 @@ export default function Presentear() {
             <button type="submit" className="nv-btn nv-btn--block">
               Ir para o pagamento
             </button>
-            <button type="button" className="checkout__link" onClick={() => navegar(BASE)}>
+            <button type="button" className="checkout__link" onClick={() => ir(BASE)}>
               ← Voltar aos presentes
             </button>
           </form>
@@ -378,7 +445,7 @@ export default function Presentear() {
                   {convidado.nome.trim()} · {convidado.email.trim()}
                 </p>
                 {convidado.mensagem.trim() && <p className="checkout__review-msg">“{convidado.mensagem.trim()}”</p>}
-                <button className="checkout__link checkout__link--inline" onClick={() => navegar(`${BASE}/dados`)}>
+                <button className="checkout__link checkout__link--inline" onClick={() => ir(`${BASE}/dados`)}>
                   Editar dados
                 </button>
               </div>

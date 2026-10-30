@@ -3,6 +3,7 @@ import type { PagamentoResultado, PedidoInput } from '@nv/shared/types';
 import { rateLimiter } from '../auth.ts';
 import { ContaNaoConectada, PagamentoRecusadoPeloMercadoPago } from '../mercadopago.ts';
 import { chavePublica } from '../mercadopagoConta.ts';
+import { abrirLink, criarLink, LinkExpirado, MAX_ITENS_LINK, type ItemLink } from '../linkCheckout.ts';
 import { MOTIVO_PADRAO, pagamentoDisponivel, pagar, PedidoInvalido, pedidoPorUid } from '../pedidos.ts';
 
 const UUID = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
@@ -19,6 +20,7 @@ const recusasNoSiteLimiter = rateLimiter(40, HORA);
 const detalheLimiter = rateLimiter(2, HORA);
 const pixLimiter = rateLimiter(5, HORA);
 const SITE = 'site';
+const linkLimiter = rateLimiter(120, 60_000);
 
 // CPF check digits (Mercado Pago also checks, but a typo is caught here with a clear message).
 function cpfValido(cpf: string): boolean {
@@ -160,5 +162,54 @@ export async function pedidosRoutes(app: FastifyInstance) {
 
   app.get<{ Params: { pedido: string } }>('/pedidos/:pedido', { schema: { params: pedidoParams } }, async (req, reply) =>
     (await pedidoPorUid(req.params.pedido)) ?? reply.code(404).send({ erro: 'Pedido não encontrado.' }),
+  );
+  // The encrypted link the checkout's address carries (see linkCheckout.ts).
+  app.post<{ Body: { itens: ItemLink[] } }>(
+    '/checkout/link',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['itens'],
+          additionalProperties: false,
+          properties: {
+            itens: {
+              type: 'array',
+              minItems: 1,
+              maxItems: MAX_ITENS_LINK,
+              items: {
+                type: 'object',
+                required: ['presenteId', 'quantidade'],
+                additionalProperties: false,
+                properties: {
+                  presenteId: { type: 'string', pattern: UUID },
+                  quantidade: { type: 'integer', minimum: 1, maximum: 10 },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      if (linkLimiter.hit(req.ip)) return reply.code(429).send({ erro: 'Muitas alterações seguidas. Aguarde um instante.' });
+      const ids = new Set(req.body.itens.map((i) => i.presenteId.toLowerCase()));
+      if (ids.size !== req.body.itens.length) return reply.code(400).send({ erro: 'Presente repetido no carrinho.' });
+      return criarLink(req.body.itens.map((i) => ({ ...i, presenteId: i.presenteId.toLowerCase() })));
+    },
+  );
+
+  app.get<{ Params: { link: string } }>(
+    '/checkout/link/:link',
+    { schema: { params: { type: 'object', required: ['link'], properties: { link: { type: 'string', pattern: '^[A-Za-z0-9_-]{44,1200}$' } } } } },
+    async (req, reply) => {
+      if (linkLimiter.hit(req.ip)) return reply.code(429).send({ erro: 'Muitas tentativas seguidas. Aguarde um instante.' });
+      try {
+        return abrirLink(req.params.link);
+      } catch (error) {
+        if (error instanceof LinkExpirado) return reply.code(410).send({ erro: 'Este link de presentes expirou. Escolha os presentes de novo na lista.' });
+        return reply.code(400).send({ erro: 'Este link de presentes não é válido. Escolha os presentes na lista.' });
+      }
+    },
   );
 }

@@ -135,6 +135,10 @@ export type PedidoInput = {
 };
 // `pedido`: the order's public UUID, the only order identifier the browser keeps. `motivo`: why a
 // card was refused, in words for the guest.
+// The checkout's address: the cart encrypted by the API (/presentear?c=<link>), valid until expiraEm.
+export type LinkCheckout = { link: string; expiraEm: string };
+export type ItensLinkCheckout = { itens: Array<{ presenteId: string; quantidade: number }>; expiraEm: string };
+
 export type PagamentoResultado = { pedido: string; status: StatusPedido; motivo?: string };
 // A Pix waiting to be paid (shown again if the guest reloads the page).
 export type PixPendente = { codigo: string; qrBase64: string | null; expiraEm: string | null };

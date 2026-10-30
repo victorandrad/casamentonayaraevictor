@@ -9,6 +9,8 @@ type Acao =
   | { tipo: 'quantidade'; id: string; quantidade: number }
   | { tipo: 'remover'; id: string }
   | { tipo: 'sincronizar'; presentes: Presente[] }
+  // The checkout opened from a link: its gifts take the cart's place (names and prices come next, with 'sincronizar').
+  | { tipo: 'substituir'; itens: ItemSalvo[] }
   | { tipo: 'limpar' };
 
 const STORAGE_KEY = 'nv_carrinho_presentes';
@@ -23,7 +25,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // anyone. So only which gifts and how many are saved, checked on the way back in; name, price and
 // availability always come from the API (the 'sincronizar' action, as soon as the list loads), and
 // the API recalculates everything again when the order is created.
-type ItemSalvo = { id: string; quantidade: number };
+export type ItemSalvo = { id: string; quantidade: number };
 // `alteradoEm`: when the guest last changed the cart (ms). Carts saved before it existed were plain arrays.
 type CarrinhoSalvo = { itens: ItemSalvo[]; alteradoEm: number };
 
@@ -85,6 +87,10 @@ function reducer(itens: ItemCarrinho[], acao: Acao): ItemCarrinho[] {
         return [{ ...i, nome: p.nome, valorCentavos: p.valorCentavos, maximo: p.disponivel, quantidade: Math.min(i.quantidade, limite(p.disponivel)) }];
       });
     }
+    case 'substituir':
+      return acao.itens
+        .filter((i) => UUID.test(i.id) && Number.isInteger(i.quantidade) && i.quantidade >= 1 && i.quantidade <= MAX_QUANTIDADE)
+        .map(({ id, quantidade }) => ({ id, quantidade, nome: '', valorCentavos: 0, maximo: null }));
     case 'limpar':
       return [];
   }
