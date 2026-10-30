@@ -408,6 +408,30 @@ export async function adminRoutes(app: FastifyInstance) {
     },
   );
 
+  // Gift given outside the site: how many units (0 undoes it).
+  app.put<{ Params: { id: string }; Body: { quantidade: number } }>(
+    '/presentes/:id/fora-do-site',
+    {
+      schema: {
+        params: uidParams,
+        body: {
+          type: 'object',
+          required: ['quantidade'],
+          additionalProperties: false,
+          properties: { quantidade: { type: 'integer', minimum: 0, maximum: 1000 } },
+        },
+      },
+    },
+    async (req, reply) => {
+      const resultado = await repo.setPresenteadosFora(req.params.id, req.body.quantidade);
+      if (!resultado) return reply.code(404).send(notFound);
+      if (resultado === 'excede') {
+        return reply.code(400).send({ erro: 'Essa quantidade passa do limite do presente, contando o que já foi pago pelo site.' });
+      }
+      return resultado;
+    },
+  );
+
   app.delete<{ Params: { id: string } }>('/presentes/:id', { schema: { params: uidParams } }, async (req, reply) => {
     const anterior = (await repo.listPresentes()).find((p) => p.id === req.params.id);
     if (!(await repo.deletePresente(req.params.id))) return reply.code(404).send(notFound);

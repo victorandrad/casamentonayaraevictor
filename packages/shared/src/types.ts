@@ -41,8 +41,10 @@ export type Presente = {
   quantidadeMaxima: number | null;
   // Still on the list (only paid units discounted); null when unlimited
   disponivel: number | null;
-  // Units already paid
+  // Units already paid on the site
   presenteados: number;
+  // Units given outside the site, marked by the couple in the panel (they count as given)
+  foraDoSite: number;
   // Units someone is paying for right now (open checkout or Pix waiting for the bank): they stay on
   // the list, but nobody else can start paying for them until that checkout ends
   emPagamento: number;
@@ -89,7 +91,7 @@ export type ConvidadoAdmin = {
 };
 export type ConvidadoInput = { nome: string; limiteAcompanhantes: number };
 export type RecadoAdmin = Recado & { visivel: boolean };
-export type PresenteInput = Omit<Presente, 'id' | 'disponivel' | 'presenteados' | 'emPagamento'>;
+export type PresenteInput = Omit<Presente, 'id' | 'disponivel' | 'presenteados' | 'emPagamento' | 'foraDoSite'>;
 export type Configuracoes = { taxa: Taxa };
 export type AplicacaoMercadoPagoInput = { clientId: string; clientSecret: string };
 // Public Key and Access Token of an application's credentials, pasted instead of connecting with OAuth.

@@ -40,17 +40,100 @@ const tipoDe = (q: number | null): Tipo => (q === null ? 'cota' : q === 1 ? 'uni
 
 // Short status for a gift card in the panel.
 function situacao(p: Presente): { texto: string; classe: string } {
+  // Given on the site plus given outside it (marked here by the couple).
+  const total = p.presenteados + p.foraDoSite;
+  const fora = p.foraDoSite > 0 ? ` (${p.foraDoSite} fora do site)` : '';
   if (p.quantidadeMaxima === null) {
-    return { texto: `Cota · ${p.presenteados} contribuição(ões)`, classe: 'cota' };
+    return { texto: `Cota · ${total} contribuição(ões)${fora}`, classe: 'cota' };
   }
   if (p.quantidadeMaxima === 1) {
     if (p.presenteados >= 1) return { texto: 'Presenteado ♥', classe: 'presenteado' };
+    if (p.foraDoSite >= 1) return { texto: 'Presenteado fora do site ♥', classe: 'presenteado' };
     if (p.emPagamento > 0) return { texto: 'Em pagamento', classe: 'reservado' };
     return { texto: 'Único · disponível', classe: 'disponivel' };
   }
-  if (p.disponivel === 0 && p.presenteados >= p.quantidadeMaxima) return { texto: `Esgotado · ${p.presenteados}/${p.quantidadeMaxima}`, classe: 'presenteado' };
+  if (p.disponivel === 0 && total >= p.quantidadeMaxima) return { texto: `Esgotado · ${total}/${p.quantidadeMaxima}${fora}`, classe: 'presenteado' };
   const emPagamento = p.emPagamento > 0 ? ` · ${p.emPagamento} em pagamento` : '';
-  return { texto: `${p.presenteados} de ${p.quantidadeMaxima} presenteados${emPagamento}`, classe: p.emPagamento > 0 ? 'reservado' : 'disponivel' };
+  return { texto: `${total} de ${p.quantidadeMaxima} presenteados${fora}${emPagamento}`, classe: p.emPagamento > 0 ? 'reservado' : 'disponivel' };
+}
+
+// Marks units given outside the site (in person, a direct transfer…). A unique gift is a yes/no; the
+// others take a number (0 undoes it).
+function ForaDoSiteModal({ presente, onSalvo, onFechar }: { presente: Presente; onSalvo: (p: Presente) => void; onFechar: () => void }) {
+  const unico = presente.quantidadeMaxima === 1;
+  const [quantidade, setQuantidade] = useState(String(unico ? (presente.foraDoSite > 0 ? 0 : 1) : presente.foraDoSite));
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
+  const limite = presente.quantidadeMaxima === null ? null : presente.quantidadeMaxima - presente.presenteados;
+
+  const salvar = async (e: FormEvent) => {
+    e.preventDefault();
+    const n = Math.floor(Number(quantidade));
+    if (!Number.isFinite(n) || n < 0) return setErro('Informe uma quantidade válida.');
+    setSalvando(true);
+    setErro('');
+    try {
+      onSalvo(await adminApi<Presente>(`/admin/presentes/${presente.id}/fora-do-site`, { method: 'PUT', body: { quantidade: n } }));
+      onFechar();
+    } catch (error) {
+      setErro(errorMessage(error));
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <Modal
+      titulo="Presenteado fora do site"
+      subtitulo={presente.nome}
+      onFechar={onFechar}
+      onSubmit={salvar}
+      bloqueado={salvando}
+      rodape={
+        <>
+          <button type="button" className="nv-btn-ghost" onClick={onFechar} disabled={salvando}>
+            Cancelar
+          </button>
+          <button type="submit" className="nv-btn" disabled={salvando}>
+            {salvando ? 'Salvando…' : unico ? (presente.foraDoSite > 0 ? 'Desmarcar' : 'Marcar como presenteado') : 'Salvar'}
+          </button>
+        </>
+      }
+    >
+      {unico ? (
+        <p className="painel-hint">
+          {presente.foraDoSite > 0
+            ? 'Este presente está marcado como dado fora do site. Desmarcar faz ele voltar para a lista do site.'
+            : 'Alguém já deu este presente por fora (em mãos, transferência…)? Marcando, ele sai da lista do site e ninguém mais consegue pagar por ele.'}
+        </p>
+      ) : (
+        <>
+          <p className="painel-hint">
+            Quantas unidades foram dadas fora do site (em mãos, transferência…)? Elas contam como presenteadas
+            {limite !== null ? ` e saem da lista do site (até ${limite}, descontando o que já foi pago pelo site)` : ''}. Use 0 para desfazer.
+          </p>
+          <div className="painel-campo">
+            <label className="nv-label" htmlFor="fora-quantidade">
+              Unidades dadas fora do site
+            </label>
+            <input
+              id="fora-quantidade"
+              className="nv-input"
+              type="number"
+              min={0}
+              max={limite ?? 1000}
+              value={quantidade}
+              onChange={(e) => setQuantidade(e.target.value)}
+            />
+          </div>
+        </>
+      )}
+      {erro && (
+        <p className="painel-alert" role="alert">
+          {erro}
+        </p>
+      )}
+    </Modal>
+  );
 }
 
 const centavosDoRascunho = (r: Rascunho) => {
@@ -272,6 +355,7 @@ export function Presentes() {
   // Which modal is open: create (in a category), edit a gift, or confirm removing one
   const [formulario, setFormulario] = useState<{ presente: Presente | null; categoriaId: number } | null>(null);
   const [removendo, setRemovendo] = useState<Presente | null>(null);
+  const [foraDoSite, setForaDoSite] = useState<Presente | null>(null);
   // Category modals: create/edit and delete
   const [categoriaForm, setCategoriaForm] = useState<{ categoria: Categoria | null } | null>(null);
   const [excluindoCategoria, setExcluindoCategoria] = useState<Categoria | null>(null);
@@ -428,6 +512,9 @@ export function Presentes() {
                   <button className="painel-link" onClick={() => setFormulario({ presente: p, categoriaId: p.categoriaId })}>
                     Editar
                   </button>
+                  <button className="painel-link" onClick={() => setForaDoSite(p)}>
+                    Fora do site
+                  </button>
                   <button className="painel-link painel-link--danger" onClick={() => setRemovendo(p)}>
                     Remover
                   </button>
@@ -459,6 +546,7 @@ export function Presentes() {
           onFechar={() => setExcluindoCategoria(null)}
         />
       )}
+      {foraDoSite && <ForaDoSiteModal presente={foraDoSite} onSalvo={aoSalvar} onFechar={() => setForaDoSite(null)} />}
       {removendo && (
         <ConfirmarModal
           titulo="Remover presente"

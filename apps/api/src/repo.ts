@@ -326,13 +326,14 @@ type PresenteRow = {
   quantidade_maxima: number | null;
   presenteados: string;
   em_pagamento: string;
+  presenteados_fora: number;
 };
 
 // Paid units (the only ones that leave the list), and units being paid right now: a payment
 // request in flight or a Pix waiting for the bank. Those don't leave the list, but a second
 // guest can't start paying for them at the same time (see pagar in pedidos.ts).
 export const PRESENTE_SELECT = `
-  SELECT p.id, p.uid, p.categoria_id, p.nome, p.valor_centavos, p.foto_url, p.quantidade_maxima,
+  SELECT p.id, p.uid, p.categoria_id, p.nome, p.valor_centavos, p.foto_url, p.quantidade_maxima, p.presenteados_fora,
          coalesce(v.presenteados, 0) AS presenteados, coalesce(v.em_pagamento, 0) AS em_pagamento
     FROM presentes p
     LEFT JOIN (
@@ -352,6 +353,7 @@ export const PRESENTE_SELECT = `
 
 export const toPresente = (r: PresenteRow): Presente => {
   const presenteados = Number(r.presenteados);
+  const foraDoSite = r.presenteados_fora;
   return {
     id: r.uid,
     categoriaId: r.categoria_id,
@@ -359,8 +361,9 @@ export const toPresente = (r: PresenteRow): Presente => {
     valorCentavos: r.valor_centavos,
     fotoUrl: r.foto_url,
     quantidadeMaxima: r.quantidade_maxima,
-    disponivel: r.quantidade_maxima === null ? null : Math.max(0, r.quantidade_maxima - presenteados),
+    disponivel: r.quantidade_maxima === null ? null : Math.max(0, r.quantidade_maxima - presenteados - foraDoSite),
     presenteados,
+    foraDoSite,
     emPagamento: Number(r.em_pagamento),
   };
 };
@@ -392,6 +395,16 @@ export async function updatePresente(uid: string, input: PresenteInput): Promise
     [uid, input.categoriaId, input.nome, input.valorCentavos, input.fotoUrl || null, input.quantidadeMaxima],
   );
   return row ? getPresente(uid) : null;
+}
+
+// Units given outside the site, set by the couple in the panel. For a limited gift it can't go past
+// what the site hasn't already sold (paid units stay). Returns null when the gift doesn't exist.
+export async function setPresenteadosFora(uid: string, quantidade: number): Promise<Presente | 'excede' | null> {
+  const atual = await getPresente(uid);
+  if (!atual) return null;
+  if (atual.quantidadeMaxima !== null && quantidade > atual.quantidadeMaxima - atual.presenteados) return 'excede';
+  await query('UPDATE presentes SET presenteados_fora = $2 WHERE uid = $1', [uid, quantidade]);
+  return getPresente(uid);
 }
 
 export async function deletePresente(uid: string): Promise<boolean> {
