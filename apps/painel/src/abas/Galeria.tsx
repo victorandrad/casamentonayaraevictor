@@ -231,6 +231,10 @@ function CartaoFoto({ foto, onEditar, onExcluir }: { foto: FotoGaleria; onEditar
           <button className="painel-link" onClick={onEditar}>
             Editar
           </button>
+          {/* JPG with a readable name, converted by the API from the stored photo. */}
+          <a className="painel-link" href={`/api/admin/galeria/${foto.id}/download`} download>
+            Baixar
+          </a>
           <button className="painel-link painel-link--danger" onClick={onExcluir}>
             Excluir
           </button>
@@ -280,6 +284,11 @@ export function Galeria() {
             <span className="organizar__estado" role="status">
               {salvo}
             </span>
+          )}
+          {fotos && fotos.length > 0 && (
+            <a className="nv-btn-ghost" href="/api/admin/galeria/fotos.zip" download>
+              Baixar todas (.zip)
+            </a>
           )}
           <button className="nv-btn" onClick={() => setEnviandoFotos(true)}>
             + Enviar fotos

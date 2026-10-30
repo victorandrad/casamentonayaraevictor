@@ -7,7 +7,10 @@ import * as repo from '../repo.ts';
 import { enviarReciboDoPedido, listarPedidos } from '../pedidos.ts';
 import * as mercadoPagoConta from '../mercadopagoConta.ts';
 import { ultimoErroMercadoPago } from '../mercadopago.ts';
-import { ImagemInvalida, LADO_GALERIA, LADO_PRESENTE, removerImagem, salvarImagem, TIPOS_ACEITOS } from '../uploads.ts';
+import { fotoEmJpeg, ImagemInvalida, LADO_GALERIA, LADO_PRESENTE, removerImagem, salvarImagem, TIPOS_ACEITOS } from '../uploads.ts';
+import { gerarZip } from '../zip.ts';
+import { rotuloMomento } from '@nv/shared/galeria';
+import { Readable } from 'node:stream';
 import * as usuarios from '../usuarios.ts';
 
 const idParams = {
@@ -235,6 +238,51 @@ export async function adminRoutes(app: FastifyInstance) {
   app.post<{ Body: FotoGaleriaInput }>('/galeria', { schema: { body: fotoGaleriaBody } }, async (req, reply) =>
     reply.code(201).send(await repo.createFoto({ ...req.body, legenda: req.body.legenda.trim() })),
   );
+
+  // Downloading the album: one photo, or all of them in a .zip, as JPG with readable names in album
+  // order (e.g. "03-cerimonia-entrada-da-noiva.jpg"). Photos linked from elsewhere are left out.
+  const nomesDasFotos = (fotos: Array<{ id: number; legenda: string; momento: string }>) => {
+    const slug = (texto: string) =>
+      texto
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 40);
+    const largura = String(fotos.length).length < 2 ? 2 : String(fotos.length).length;
+    return new Map(
+      fotos.map((f, i) => [
+        f.id,
+        `${String(i + 1).padStart(largura, '0')}-${[slug(rotuloMomento(f.momento)), slug(f.legenda)].filter(Boolean).join('-')}.jpg`,
+      ]),
+    );
+  };
+
+  app.get('/galeria/fotos.zip', async (req, reply) => {
+    const fotos = await repo.listFotos();
+    const nomes = nomesDasFotos(fotos);
+    // Each photo is converted only when its turn comes in the stream.
+    const arquivos = fotos.map((f) => ({ nome: nomes.get(f.id)!, dados: () => fotoEmJpeg(f.url) }));
+    req.log.info({ fotos: fotos.length }, 'álbum baixado');
+    return reply
+      .header('Content-Type', 'application/zip')
+      .header('Content-Disposition', 'attachment; filename="album-nayara-e-victor.zip"')
+      .send(Readable.from(gerarZip(arquivos)));
+  });
+
+  app.get<{ Params: { id: number } }>('/galeria/:id/download', { schema: { params: idParams } }, async (req, reply) => {
+    const fotos = await repo.listFotos();
+    const foto = fotos.find((f) => f.id === req.params.id);
+    if (!foto) return reply.code(404).send(notFound);
+    const jpeg = await fotoEmJpeg(foto.url);
+    if (!jpeg) return reply.code(404).send({ erro: 'Esta foto não está guardada no site (é um link externo).' });
+    const nome = nomesDasFotos(fotos).get(foto.id)!;
+    return reply
+      .header('Content-Type', 'image/jpeg')
+      .header('Content-Disposition', `attachment; filename="${nome}"`)
+      .send(jpeg);
+  });
 
   // Before /galeria/:id so "ordem" is not read as an id.
   app.put<{ Body: { ids: number[] } }>(

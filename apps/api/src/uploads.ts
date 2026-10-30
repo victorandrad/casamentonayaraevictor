@@ -2,7 +2,7 @@
 // sharp (resized to fit, WebP), which also strips metadata such as GPS and
 // guarantees we only ever store and serve real images.
 import { randomBytes } from 'node:crypto';
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { config } from './config.ts';
@@ -44,4 +44,17 @@ export async function removerImagem(url: string | null | undefined) {
   const nome = url.slice(UPLOADS_PREFIX.length);
   if (!NOME_ARQUIVO.test(nome)) return;
   await unlink(join(config.uploadsDir, nome)).catch(() => {});
+}
+
+// A photo uploaded here, as a JPG to download (opens anywhere; the stored WebP doesn't on every
+// device). Null for an external link or a missing file.
+export async function fotoEmJpeg(url: string): Promise<Buffer | null> {
+  if (!url.startsWith(UPLOADS_PREFIX)) return null;
+  const nome = url.slice(UPLOADS_PREFIX.length);
+  if (!NOME_ARQUIVO.test(nome)) return null;
+  try {
+    return await sharp(await readFile(join(config.uploadsDir, nome))).jpeg({ quality: 90 }).toBuffer();
+  } catch {
+    return null;
+  }
 }
