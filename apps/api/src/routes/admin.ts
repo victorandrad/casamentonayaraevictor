@@ -7,6 +7,7 @@ import * as repo from '../repo.ts';
 import { enviarReciboDoPedido, listarPedidos } from '../pedidos.ts';
 import * as mercadoPagoConta from '../mercadopagoConta.ts';
 import { ultimoErroMercadoPago } from '../mercadopago.ts';
+import { avisosCsp } from './csp.ts';
 import { fotoEmJpeg, ImagemInvalida, LADO_GALERIA, LADO_PRESENTE, removerImagem, salvarImagem, TIPOS_ACEITOS } from '../uploads.ts';
 import { gerarZip } from '../zip.ts';
 import { rotuloMomento } from '@nv/shared/galeria';
@@ -81,7 +82,11 @@ export async function adminRoutes(app: FastifyInstance) {
   // readable: the gift list shows the fee from them).
   app.addHook('preHandler', async (req, reply) => {
     const rota = req.routeOptions.url ?? '';
-    if ((rota === '/api/admin/configuracoes' && req.method !== 'GET') || rota.startsWith('/api/admin/mercadopago')) {
+    if (
+      (rota === '/api/admin/configuracoes' && req.method !== 'GET') ||
+      rota.startsWith('/api/admin/mercadopago') ||
+      rota.startsWith('/api/admin/seguranca')
+    ) {
       return requireOwner(req, reply);
     }
   });
@@ -532,6 +537,9 @@ export async function adminRoutes(app: FastifyInstance) {
 
   // Mercado Pago: "Conectar ao Mercado Pago" sends the couple to authorize the application, and
   // Mercado Pago brings them back to /retorno, which goes on to the panel with the result.
+  // What the site's Content Security Policy blocked (or would block), for the couple to review.
+  app.get('/seguranca/csp', async () => avisosCsp());
+
   app.get('/mercadopago', async () => ({ ...(await mercadoPagoConta.situacao()), ultimoErro: ultimoErroMercadoPago() }));
 
   app.put<{ Body: AplicacaoMercadoPagoInput }>(

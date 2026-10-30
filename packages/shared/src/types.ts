@@ -162,4 +162,8 @@ export type PedidoAdmin = Omit<PedidoPublico, 'pix'> & {
   reciboEnviadoEm: string | null;
 };
 
+// What the Content Security Policy blocked (or would block, in report-only mode), grouped.
+export type AvisoCsp = { diretiva: string; bloqueado: string; pagina: string; quantidade: number; ultimo: string };
+export type AvisosCsp = { desde: string; avisos: AvisoCsp[] };
+
 export type ApiErro = { erro: string };

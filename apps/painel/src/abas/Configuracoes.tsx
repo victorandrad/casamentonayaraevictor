@@ -6,6 +6,7 @@ import type { Configuracoes as ConfigData, Usuario } from '@nv/shared/types';
 import { adminApi } from '../adminApi';
 import { useLoad } from '../useLoad';
 import { ContaMercadoPago } from '../ContaMercadoPago';
+import { SegurancaSite } from '../SegurancaSite';
 
 const carregar = () => adminApi<ConfigData>('/admin/configuracoes');
 
@@ -90,6 +91,8 @@ export function Configuracoes({ usuario }: { usuario: Usuario }) {
           </p>
         )}
       </form>
+
+      <SegurancaSite />
 
       <div className="painel-card painel-narrow">
         <h3 className="painel-h3">Sua conta</h3>
