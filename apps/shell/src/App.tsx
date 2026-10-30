@@ -1,4 +1,5 @@
 import { lazy, useEffect, useState } from 'react';
+import { useCaminho } from '@nv/shared';
 import { RemoteSlot } from './RemoteSlot';
 import { Nav } from './components/Nav';
 import { Hero } from './components/Hero';
@@ -15,6 +16,7 @@ const Local = lazy(() => import('evento/Local'));
 const Rsvp = lazy(() => import('rsvp/Rsvp'));
 const Portaria = lazy(() => import('rsvp/Portaria'));
 const Presentes = lazy(() => import('presentes/Presentes'));
+const Presentear = lazy(() => import('presentes/Presentear'));
 const Galeria = lazy(() => import('mural/Galeria'));
 const Recados = lazy(() => import('mural/Recados'));
 const Painel = lazy(() => import('painel/Painel'));
@@ -25,7 +27,7 @@ const MAPA_VISTO = 'nv_mapa_visto';
 // something (invite, check-in, a section, the return from payment). #mapa forces it.
 function mostrarMapa(): boolean {
   if (location.hash === '#mapa') return true;
-  if (location.hash || new URLSearchParams(location.search).has('pedido')) return false;
+  if (location.pathname.replace(/\/+$/, '') !== '' || location.hash || new URLSearchParams(location.search).has('pedido')) return false;
   try {
     return localStorage.getItem(MAPA_VISTO) !== '1';
   } catch {
@@ -35,6 +37,7 @@ function mostrarMapa(): boolean {
 
 export function App() {
   const [mapa, setMapa] = useState(mostrarMapa);
+  const caminho = useCaminho().replace(/\/+$/, '');
 
   // A link to #mapa while the site is open plays the opening again.
   useEffect(() => {
@@ -48,8 +51,17 @@ export function App() {
     return () => window.removeEventListener('hashchange', aoMudar);
   }, []);
   // The couple's panel lives at /painel and replaces the public site.
-  if (location.pathname.replace(/\/+$/, '') === '/painel') {
+  if (caminho === '/painel') {
     return <RemoteSlot name="painel/Painel" component={Painel} />;
+  }
+  // The gift checkout: its own pages (cart, details, payment, the order), without the site's menu.
+  if (caminho === '/presentear' || caminho.startsWith('/presentear/')) {
+    return (
+      <>
+        <RemoteSlot name="presentes/Presentear" component={Presentear} />
+        <AvisoCookies />
+      </>
+    );
   }
 
   const fecharMapa = () => {

@@ -107,47 +107,6 @@
   .presentes-cart-fab { left: 16px; justify-content: space-between; }
 }
 
-/* Checkout drawer: side panel on desktop, bottom sheet on phones */
-.checkout-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 105;
-  display: flex;
-  justify-content: flex-end;
-  background: rgba(120, 90, 80, 0.35);
-  backdrop-filter: blur(4px);
-  animation: checkout-fade 0.3s ease both;
-}
-@keyframes checkout-fade { from { opacity: 0; } }
-.checkout {
-  width: min(480px, 100%);
-  height: 100%;
-  overflow-y: auto;
-  background: var(--nv-cream);
-  border-left: 1px solid var(--nv-blush-line);
-  box-shadow: -30px 0 60px -40px rgba(67, 56, 47, 0.5);
-  animation: checkout-slide 0.45s var(--nv-ease) both;
-}
-@keyframes checkout-slide { from { transform: translateX(40px); opacity: 0.4; } }
-@media (max-width: 560px) {
-  .checkout-overlay { align-items: flex-end; }
-  .checkout { height: auto; max-height: 92vh; border-left: none; border-radius: 22px 22px 0 0; animation-name: checkout-rise; }
-  @keyframes checkout-rise { from { transform: translateY(40px); opacity: 0.4; } }
-}
-
-.checkout__header {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 20px;
-  background: rgba(246, 241, 234, 0.95);
-  backdrop-filter: blur(6px);
-  border-bottom: 1px solid var(--nv-border);
-}
 .checkout__steps { display: flex; gap: 6px; list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--nv-taupe); }
 .checkout__steps li { display: flex; align-items: center; gap: 6px; }
 .checkout__steps li + li::before { content: ''; width: 14px; height: 1px; background: var(--nv-border-strong); margin-right: 2px; }
@@ -166,21 +125,6 @@
 @media (max-width: 400px) {
   .checkout__steps li:not(.is-current) .checkout__step-label { display: none; }
 }
-.checkout__close {
-  flex: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  border: 1px solid var(--nv-border);
-  background: none;
-  font-size: 22px;
-  line-height: 1;
-  color: var(--nv-taupe);
-  cursor: pointer;
-}
-.checkout__close:hover { background: var(--nv-blush-soft); }
-
-.checkout__body { padding: 26px 24px 32px; }
 .checkout__title { font-family: var(--nv-serif); font-weight: 400; font-size: 28px; margin: 0 0 18px; outline: none; }
 .checkout__hint { font-size: 14px; color: var(--nv-muted); margin: -10px 0 22px; }
 .checkout__link {
@@ -285,7 +229,6 @@
 .checkout .nv-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 
 /* The order's screen after paying (thank-you, Pix code) */
-.retorno-overlay { justify-content: center; align-items: center; padding: 18px; }
 .retorno {
   position: relative;
   width: min(460px, 100%);
@@ -298,7 +241,6 @@
   border-radius: 999px 999px 22px 22px;
   box-shadow: 0 40px 80px -40px rgba(67, 56, 47, 0.55);
 }
-.retorno__close { position: absolute; top: 14px; right: 14px; }
 .retorno .checkout__summary { text-align: left; }
 .retorno__icon {
   width: 76px;
@@ -419,23 +361,6 @@
 .checkout__selo svg { vertical-align: -2px; margin-right: 4px; }
 .checkout__selo b { font-weight: 500; color: var(--nv-text); }
 
-/* "Sair do pagamento?" over the checkout */
-.checkout__confirmar {
-  position: fixed;
-  inset: 0;
-  z-index: 110;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(246, 241, 234, 0.92);
-  backdrop-filter: blur(3px);
-  animation: checkout-fade 0.2s ease both;
-}
-.checkout__confirmar-caixa { width: min(340px, 100%); padding: 26px 24px 14px; border: 1px solid var(--nv-border); border-radius: 18px; background: var(--nv-card); text-align: center; box-shadow: 0 24px 48px -30px rgba(67, 56, 47, 0.45); }
-.checkout__confirmar-caixa h3 { margin: 0 0 8px; font-family: var(--nv-serif); font-weight: 400; font-size: 22px; color: var(--nv-ink); }
-.checkout__confirmar-caixa p { margin: 0 0 18px; font-size: 14px; line-height: 1.6; color: var(--nv-text); }
-
 /* Pix screen: compact, ordinary corners (the arch wastes height and clips the top), QR first */
 .retorno--pix { padding: 26px 22px 20px; border-radius: 26px; }
 .retorno--pix .retorno__title { font-size: 34px; margin-top: 4px; }
@@ -448,16 +373,7 @@
   .retorno--pix .retorno__qr { width: 180px; height: 180px; }
 }
 
-/* Desktop: the Pix screen in two columns (QR on the left, code and status on the right), so it fits
-   without scrolling; a thin scrollbar in the theme's colours when a short window still needs one. */
-.retorno,
-.checkout { scrollbar-width: thin; scrollbar-color: var(--nv-border-strong) transparent; }
-.retorno::-webkit-scrollbar,
-.checkout::-webkit-scrollbar { width: 6px; }
-.retorno::-webkit-scrollbar-thumb,
-.checkout::-webkit-scrollbar-thumb { background: var(--nv-border-strong); border-radius: 999px; }
-.retorno::-webkit-scrollbar-track,
-.checkout::-webkit-scrollbar-track { background: transparent; }
+/* Desktop: the Pix screen in two columns (QR on the left, code and status on the right). */
 @media (min-width: 760px) {
   .retorno--pix { width: min(740px, 100%); padding: 30px 34px 24px; }
   .retorno--pix .retorno__pix {
@@ -473,4 +389,95 @@
   .retorno--pix .retorno__pix > :not(.retorno__qr) { grid-column: 2; }
   .retorno--pix .retorno__text { margin: 0; }
   .retorno--pix .retorno__aguardando { margin: 0; }
+}
+
+/* ---- Checkout as its own pages (/presentear) ---- */
+.presentear { min-height: 100vh; display: flex; flex-direction: column; background: var(--nv-cream); }
+.presentear__topo {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px max(20px, calc((100vw - 1040px) / 2));
+  background: rgba(246, 241, 234, 0.94);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--nv-border);
+}
+.presentear__marca {
+  flex: none;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--nv-serif);
+  font-size: 22px;
+  letter-spacing: 3px;
+  color: var(--nv-ink);
+  cursor: pointer;
+}
+.presentear__marca em { font-family: var(--nv-script); font-style: normal; color: var(--nv-rose); margin: 0 2px; }
+.presentear__etapas { flex: 1; justify-content: center; margin: 0; }
+.presentear__selo { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--nv-muted); white-space: nowrap; }
+.presentear__conteudo { flex: 1; width: 100%; max-width: 1040px; margin: 0 auto; padding: 40px 20px 24px; }
+.presentear__pagina { max-width: 560px; margin: 0 auto; }
+.presentear__titulo { margin: 0 0 18px; font-family: var(--nv-serif); font-weight: 400; font-size: 34px; color: var(--nv-ink); outline: none; }
+.presentear__vazio { text-align: center; padding: 40px 0; }
+.presentear__rodape { display: flex; justify-content: center; padding: 8px 20px 40px; }
+
+/* Payment: summary on the left, Mercado Pago's form with room on the right (stacked on phones) */
+.presentear__pagamento {
+  display: grid;
+  grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+  grid-template-areas: 'resumo formulario' 'extra formulario';
+  grid-template-rows: auto 1fr;
+  column-gap: 40px;
+  align-items: start;
+}
+.presentear__resumo { grid-area: resumo; }
+.presentear__formulario { grid-area: formulario; }
+.presentear__extra { grid-area: extra; }
+.presentear__de { margin: 18px 0; padding: 16px 18px; border: 1px dashed var(--nv-blush-line); border-radius: 14px; }
+.presentear__de p { margin: 4px 0 0; font-size: 15px; color: var(--nv-text); word-break: break-word; }
+.presentear__de .checkout__link--inline { margin-top: 8px; font-size: 13px; }
+.presentear__formulario { min-width: 0; padding: 22px; border: 1px solid var(--nv-border); border-radius: 22px; background: var(--nv-card); }
+.presentear__formulario .checkout__brick { margin: 0; }
+
+/* The order's page (thank-you, Pix): the same card as before, now in the page */
+.retorno--pagina { margin: 0 auto; max-height: none; overflow: visible; box-shadow: 0 30px 60px -40px rgba(67, 56, 47, 0.45); }
+
+/* On the list: a payment still open from an earlier visit */
+.presentes-pedido-aberto {
+  position: fixed;
+  left: max(16px, env(safe-area-inset-left));
+  bottom: max(18px, env(safe-area-inset-bottom));
+  z-index: 58;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border: 1px solid var(--nv-blush-line);
+  border-radius: 999px;
+  background: rgba(253, 250, 247, 0.96);
+  box-shadow: 0 20px 40px -18px rgba(143, 84, 78, 0.55);
+  color: var(--nv-rose-deep);
+  font-family: var(--nv-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.presentes-pedido-aberto span { display: flex; flex-direction: column; }
+.presentes-pedido-aberto strong { font-weight: 500; font-size: 14px; color: var(--nv-ink); }
+.presentes-pedido-aberto small { font-size: 12px; color: var(--nv-rose-link); }
+
+@media (max-width: 860px) {
+  .presentear__pagamento { grid-template-columns: 1fr; grid-template-areas: 'resumo' 'formulario' 'extra'; grid-template-rows: auto; row-gap: 18px; }
+}
+@media (max-width: 640px) {
+  .presentear__topo { flex-wrap: wrap; gap: 10px 14px; padding: 12px 16px; }
+  .presentear__etapas { order: 3; flex-basis: 100%; }
+  .presentear__selo { margin-left: auto; }
+  .presentear__conteudo { padding: 24px 16px 16px; }
+  .presentear__titulo { font-size: 28px; }
+  .presentear__formulario { padding: 14px; border-radius: 18px; }
+  .presentes-pedido-aberto { right: max(16px, env(safe-area-inset-right)); }
 }

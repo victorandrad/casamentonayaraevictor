@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Icon, Ornament } from '@nv/shared';
+import { Icon, navegar, Ornament } from '@nv/shared';
 import { ApiError, errorMessage, formatBRL } from '@nv/shared/api';
 import type { PedidoPublico } from '@nv/shared/types';
 import { consultarPedido, esquecerPedidoAberto } from './pagamento';
 
-// `uid`: the order's public UUID.
-type Props = { uid: string; onConcluido: () => void; onFechar: () => void };
+// `uid`: the order's public UUID (from the address, /presentear/pedido/<uid>).
+type Props = { uid: string; onConcluido: () => void };
 
 // A payment Mercado Pago hasn't confirmed yet: ask for about 45 seconds.
 const TENTATIVAS = 15;
@@ -19,7 +19,7 @@ const horario = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hou
 
 // The order's screen after paying in the site: thank-you for an approved card, the Pix code while
 // it waits (followed until it is paid or expires), or what went wrong.
-export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
+export function Pedido({ uid, onConcluido }: Props) {
   const [pedido, setPedido] = useState<PedidoPublico | null>(null);
   const [erro, setErro] = useState('');
   const [copiado, setCopiado] = useState(false);
@@ -81,16 +81,8 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
     return () => clearTimeout(timer);
   }, [expiraEm]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onFechar();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onFechar]);
-
-  const irParaRecados = () => {
-    onFechar();
-    document.getElementById('recados')?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const irParaRecados = () => navegar('/#recados');
+  const voltarALista = () => navegar('/#presentes');
 
   const copiarPix = async () => {
     if (!pedido?.pix) return;
@@ -122,13 +114,8 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
           : 'Confirmando pagamento…';
 
   return (
-    // Only the X closes it (like the checkout): a stray click must not hide a Pix being paid.
-    <div className="checkout-overlay retorno-overlay">
-      <div className={pix ? 'retorno retorno--pix nv-fade-up' : 'retorno nv-fade-up'} role="dialog" aria-modal="true" aria-label={titulo}>
-        <button className="checkout__close retorno__close" onClick={onFechar} aria-label="Fechar">
-          ×
-        </button>
-
+    <section className={pix ? 'retorno retorno--pagina retorno--pix nv-fade-up' : 'retorno retorno--pagina nv-fade-up'} aria-label={titulo}>
+      <div>
         {erro ? (
           <>
             <h2 className="checkout__title">Não conseguimos confirmar</h2>
@@ -218,20 +205,20 @@ export function RetornoPagamento({ uid, onConcluido, onFechar }: Props) {
             <button className="nv-btn nv-btn--block" onClick={irParaRecados}>
               Deixar um recado no mural
             </button>
-            <button className="checkout__link" onClick={onFechar}>
-              Voltar ao site
+            <button className="checkout__link" onClick={voltarALista}>
+              Voltar à lista de presentes
             </button>
           </>
         ) : status === 'aguardando' ? (
-          <button className="checkout__link" onClick={onFechar}>
-            Voltar ao site
+          <button className="checkout__link" onClick={voltarALista}>
+            Voltar à lista de presentes
           </button>
         ) : (
-          <button className="nv-btn-outline retorno__ok" onClick={onFechar}>
-            Fechar
+          <button className="nv-btn-outline retorno__ok" onClick={voltarALista}>
+            Voltar à lista de presentes
           </button>
         )}
       </div>
-    </div>
+    </section>
   );
 }

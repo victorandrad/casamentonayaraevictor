@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { EstadoVazio, Icon, Placeholder, SectionHeader, type IconName } from '@nv/shared';
-import { api, errorMessage, formatBRL } from '@nv/shared/api';
-import { precoComTaxa } from '@nv/shared/taxas';
+import { EstadoVazio, Icon, navegar, Placeholder, SectionHeader, type IconName } from '@nv/shared';
+import { errorMessage, formatBRL } from '@nv/shared/api';
 import { iconeDaCategoria } from '@nv/shared/categorias';
 import type { ListaPresentes, Presente } from '@nv/shared/types';
 import { useCarrinho } from './carrinho';
-import { Checkout } from './Checkout';
-import { pedidoEmAberto, type Convidado } from './pagamento';
-import { RetornoPagamento } from './RetornoPagamento';
+import { buscarLista } from './lista';
+import { pedidoEmAberto } from './pagamento';
 import { Paginacao, POR_PAGINA, gravarFiltroNaUrl, lerFiltroDaUrl, type Filtro } from './Paginacao';
 import './presentes.css';
 
@@ -82,34 +80,19 @@ function GiftGrid({ icon, titulo, gifts, noCarrinho, recemAdicionado, onAdiciona
   );
 }
 
-const CONVIDADO_VAZIO: Convidado = { nome: '', email: '', mensagem: '', cpf: '' };
-
 export default function Presentes() {
   const [lista, setLista] = useState<ListaPresentes | null>(null);
   const [erro, setErro] = useState('');
-  const [checkoutAberto, setCheckoutAberto] = useState(false);
-  // What the guest typed in the checkout, kept in memory only (not in the browser's storage: it has the CPF).
-  const [convidado, setConvidado] = useState<Convidado>(CONVIDADO_VAZIO);
   const [recemAdicionado, setRecemAdicionado] = useState<string | null>(null);
-  // The order whose screen is open: a payment just made (`novo`), or one still open from an earlier
-  // visit (a Pix waiting), which must not touch the cart the guest may have filled since.
-  const [pedidoAberto, setPedidoAberto] = useState<{ uid: string; novo: boolean } | null>(() => {
-    const uid = pedidoEmAberto();
-    return uid ? { uid, novo: false } : null;
-  });
+  // A Pix (or a payment being confirmed) from an earlier visit: a note points to its page.
+  const [pedidoAberto] = useState(pedidoEmAberto);
   const [filtro, setFiltro] = useState<Filtro>(lerFiltroDaUrl);
   const topoDaLista = useRef<HTMLDivElement>(null);
   const carrinho = useCarrinho();
 
   const carregarLista = useCallback(async () => {
     try {
-      const data = await api<ListaPresentes>('/public/presentes');
-      // Guests see each gift with the payment fee already included; the API
-      // charges the same price using the same rule.
-      const comTaxa = {
-        ...data,
-        presentes: data.presentes.map((p) => ({ ...p, valorCentavos: precoComTaxa(p.valorCentavos, data.taxa) })),
-      };
+      const comTaxa = await buscarLista();
       setLista(comTaxa);
       carrinho.dispatch({ tipo: 'sincronizar', presentes: comTaxa.presentes });
     } catch (error) {
@@ -227,22 +210,21 @@ export default function Presentes() {
       </div>
 
       {pedidoAberto && (
-        <RetornoPagamento
-          uid={pedidoAberto.uid}
-          onConcluido={() => pedidoAberto.novo && carrinho.dispatch({ tipo: 'limpar' })}
-          onFechar={() => {
-            setPedidoAberto(null);
-            // The list changed (a gift was paid or is being paid): show it as it is now.
-            carregarLista();
-          }}
-        />
+        <button className="presentes-pedido-aberto" onClick={() => navegar(`/presentear/pedido/${pedidoAberto}`)}>
+          <Icon name="clock" size={18} />
+          <span>
+            <strong>Você tem um pagamento em andamento</strong>
+            <small>Ver o Pix ou a confirmação →</small>
+          </span>
+        </button>
       )}
 
-      {carrinho.quantidade > 0 && !checkoutAberto && !pedidoAberto && (
+      {/* The checkout is its own pages (/presentear): cart, details, payment. */}
+      {carrinho.quantidade > 0 && (
         <button
           key={carrinho.quantidade}
           className="presentes-cart-fab"
-          onClick={() => setCheckoutAberto(true)}
+          onClick={() => navegar('/presentear')}
           aria-label={`Ver carrinho: ${carrinho.quantidade} presente(s), ${formatBRL(carrinho.total)}`}
         >
           <span className="presentes-cart-fab__icon">
@@ -257,23 +239,6 @@ export default function Presentes() {
         </button>
       )}
 
-      {checkoutAberto && (
-        <Checkout
-          itens={carrinho.itens}
-          total={carrinho.total}
-          onQuantidade={(id, quantidade) => carrinho.dispatch({ tipo: 'quantidade', id, quantidade })}
-          onRemover={(id) => carrinho.dispatch({ tipo: 'remover', id })}
-          onFechar={() => setCheckoutAberto(false)}
-          convidado={convidado}
-          onConvidado={setConvidado}
-          onConcluido={(pedido) => {
-            setCheckoutAberto(false);
-            // Paid: the next gift starts with an empty form (the CPF must not linger).
-            setConvidado(CONVIDADO_VAZIO);
-            setPedidoAberto({ uid: pedido, novo: true });
-          }}
-        />
-      )}
     </section>
   );
 }
