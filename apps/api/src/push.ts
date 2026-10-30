@@ -85,7 +85,18 @@ export async function inscrever(pedidoUid: string, sub: PushSubscription): Promi
 // ---- Sending ----
 
 type Aviso = { titulo: string; corpo: string; url: string; tag: string };
-type Linha = { id: number; endpoint: string; p256dh: string; auth: string; uid: string; status: string; nome: string; minutos: number | null; lembrar: boolean };
+type Linha = {
+  id: number;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  uid: string;
+  status: string;
+  nome: string;
+  minutos: number | null;
+  lembrar: boolean;
+  pixVencido: boolean;
+};
 
 function avisoFinal(l: Linha): Aviso | null {
   const primeiro = l.nome.trim().split(/\s+/)[0] ?? '';
@@ -100,7 +111,8 @@ function avisoFinal(l: Linha): Aviso | null {
   }
   if (l.status === 'expirado' || l.status === 'falhou' || l.status === 'estornado') {
     return {
-      titulo: l.status === 'expirado' ? 'O Pix venceu' : 'Pagamento não concluído',
+      // A Pix past its deadline is cancelled at Mercado Pago, which leaves the order as refused.
+      titulo: l.status === 'expirado' || (l.status === 'falhou' && l.pixVencido) ? 'O Pix venceu' : 'Pagamento não concluído',
       corpo: 'Nada foi cobrado e o presente voltou para a lista. Se ainda quiser presentear, é só escolher de novo.',
       url: '/#presentes',
       tag,
@@ -138,6 +150,7 @@ export async function enviarAvisos(): Promise<void> {
     const linhas = await query<Linha>(
       `SELECT i.id, i.endpoint, i.p256dh, i.auth, p.uid, p.status, p.nome,
               ceil(extract(epoch FROM p.pix_expira_em - now()) / 60)::int AS minutos,
+              coalesce(p.pix_expira_em < now(), false) AS "pixVencido",
               (p.status = 'aguardando' AND i.lembrete_enviado_em IS NULL
                 AND p.pix_expira_em BETWEEN now() AND now() + make_interval(mins => $1)) AS lembrar
          FROM push_inscricoes i JOIN pedidos p ON p.id = i.pedido_id
