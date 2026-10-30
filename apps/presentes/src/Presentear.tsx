@@ -458,14 +458,6 @@ export default function Presentear() {
         )}
       </main>
 
-      {/* The order's page has its own way back. */}
-      {!pedidoUid && (
-        <footer className="presentear__rodape">
-          <button className="checkout__link" onClick={voltarALista}>
-            ← Voltar à lista de presentes
-          </button>
-        </footer>
-      )}
     </div>
   );
 }
