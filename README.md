@@ -275,6 +275,8 @@ Produção em **https://casamentonayaraevictor.com.br**, num VPS da Hostinger at
 - **Backend** ([backend.yml](.github/workflows/backend.yml)): API → `ghcr.io/victorandrad/casamento-api`
 - **Frontend** ([frontend.yml](.github/workflows/frontend.yml)): shell e microfrontends → `ghcr.io/victorandrad/casamento-web`
 
+Fora do deploy, o **Monitor** ([monitor.yml](.github/workflows/monitor.yml)) confere a cada 5 minutos a home, `/api/health`, o manifest de cada microfrontend e a validade do certificado. Se algo cair, abre a issue `[monitor] Site fora do ar` (o GitHub avisa por e-mail e no app) e a fecha sozinho quando volta. O GitHub desliga workflows agendados depois de 60 dias sem commits: se o repositório ficar parado, reative em *Actions → Monitor*.
+
 ```mermaid
 flowchart LR
     I[install<br/>npm ci] --> SE[security<br/>OSV-Scanner]
