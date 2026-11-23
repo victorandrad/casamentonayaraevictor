@@ -99,7 +99,10 @@ async function seedContent() {
     console.log('Presentes de exemplo criados.');
   }
   if (await isEmpty('convidados')) {
-    for (const [nome, limite] of convidados) await repo.createConvidado({ nome, limiteAcompanhantes: limite });
+    // Every other sample invite also goes to the reception
+    for (const [i, [nome, limite]] of convidados.entries()) {
+      await repo.createConvidado({ nome, limiteAcompanhantes: limite, recepcao: i % 2 === 0 });
+    }
     console.log('Convidados de exemplo criados.');
   }
   if (await isEmpty('recados')) {

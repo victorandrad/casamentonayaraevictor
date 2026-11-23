@@ -20,12 +20,14 @@ import type {
 } from '@nv/shared/types';
 import { TAXA_PADRAO, type Taxa } from '@nv/shared/taxas';
 import { query, queryOne, transaction } from './db.ts';
+import { recepcao } from './recepcao.ts';
 
 type ConvidadoRow = {
   id: number;
   codigo: string;
   nome: string;
   limite_acompanhantes: number;
+  recepcao: boolean;
   criado_em: Date;
   status: 'sim' | 'nao' | null;
   acompanhantes: number | null;
@@ -34,7 +36,7 @@ type ConvidadoRow = {
 };
 
 const CONVIDADO_SELECT = `
-  SELECT c.id, c.codigo, c.nome, c.limite_acompanhantes, c.criado_em,
+  SELECT c.id, c.codigo, c.nome, c.limite_acompanhantes, c.recepcao, c.criado_em,
          r.status, r.acompanhantes, r.mensagem, r.respondido_em
   FROM convidados c LEFT JOIN respostas r ON r.convidado_id = c.id`;
 
@@ -54,6 +56,7 @@ function toConvidadoAdmin(row: ConvidadoRow): ConvidadoAdmin {
     codigo: row.codigo,
     nome: row.nome,
     limiteAcompanhantes: row.limite_acompanhantes,
+    recepcao: row.recepcao,
     criadoEm: row.criado_em.toISOString(),
     resposta: toResposta(row),
   };
@@ -72,6 +75,7 @@ export async function findConvite(codigo: string): Promise<(ConvitePublico & { i
     nome: row.nome,
     limiteAcompanhantes: row.limite_acompanhantes,
     resposta: toResposta(row),
+    recepcao: row.recepcao ? recepcao : null,
   };
 }
 
@@ -118,9 +122,9 @@ function newCodigo() {
 export async function createConvidado(input: ConvidadoInput): Promise<ConvidadoAdmin> {
   for (let attempt = 0; attempt < 10; attempt++) {
     const row = await queryOne<{ id: number }>(
-      `INSERT INTO convidados (codigo, nome, limite_acompanhantes) VALUES ($1, $2, $3)
+      `INSERT INTO convidados (codigo, nome, limite_acompanhantes, recepcao) VALUES ($1, $2, $3, $4)
        ON CONFLICT (codigo) DO NOTHING RETURNING id`,
-      [newCodigo(), input.nome, input.limiteAcompanhantes],
+      [newCodigo(), input.nome, input.limiteAcompanhantes, input.recepcao],
     );
     if (row) return (await getConvidado(row.id))!;
   }
@@ -129,8 +133,8 @@ export async function createConvidado(input: ConvidadoInput): Promise<ConvidadoA
 
 export async function updateConvidado(id: number, input: ConvidadoInput): Promise<ConvidadoAdmin | null> {
   const row = await queryOne<{ id: number }>(
-    'UPDATE convidados SET nome = $2, limite_acompanhantes = $3 WHERE id = $1 RETURNING id',
-    [id, input.nome, input.limiteAcompanhantes],
+    'UPDATE convidados SET nome = $2, limite_acompanhantes = $3, recepcao = $4 WHERE id = $1 RETURNING id',
+    [id, input.nome, input.limiteAcompanhantes, input.recepcao],
   );
   if (!row) return null;
   // Keep an existing answer within the new limit

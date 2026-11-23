@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { casamento, Icon, SectionHeader } from '@nv/shared';
+import { casamento, Icon, lembrarConvite, SectionHeader } from '@nv/shared';
 import { ApiError, errorMessage } from '@nv/shared/api';
 import type { ConvitePublico, StatusResposta } from '@nv/shared/types';
 import { buscarConvite, hashParam, responderConvite } from './storage';
@@ -42,6 +42,7 @@ export default function Rsvp() {
 
   const abrirConvite = (c: ConvitePublico) => {
     setConvite(c);
+    lembrarConvite(c);
     setForm(c.resposta ? { status: c.resposta.status, acompanhantes: c.resposta.acompanhantes, mensagem: c.resposta.mensagem } : { status: 'sim', acompanhantes: 0, mensagem: '' });
     setEditando(!c.resposta);
     setErro('');

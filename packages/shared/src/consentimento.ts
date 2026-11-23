@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 // Cookie consent. The site itself only keeps essential data in the browser (cart, pending payment,
-// the map opening, the panel login), which needs no consent. Each optional category is a flag the
+// the guest's invite code, the map opening, the panel login), which needs no consent. Each optional category is a flag the
 // guest turns on or off; today the only one is the Google Maps embed, which sets Google's own cookies.
 // The choice lives in localStorage and is broadcast with a window event so every micro-frontend
 // (shell notice, evento map) sees it at once.

@@ -1,9 +1,12 @@
-import { locais, MapsLink, salvarConsentimento, SectionHeader, useConsentimento } from '@nv/shared';
+import { locais, MapsLink, salvarConsentimento, SectionHeader, useConsentimento, useConvite } from '@nv/shared';
 import './evento.css';
 
 export default function Local() {
   // The Google embed sets Google's cookies: it only loads once the guest allows it.
   const consentimento = useConsentimento();
+  // Only invites marked for the reception get its address; everyone else sees the ceremony.
+  const recepcao = useConvite()?.recepcao ?? null;
+  const mapa = recepcao ?? locais.cerimonia;
   return (
     <section id="local" className="nv-section">
       <div className="nv-container">
@@ -11,8 +14,8 @@ export default function Local() {
         <div className="local-grid">
           {consentimento?.mapa ? (
             <iframe
-              title="Recanto Espelho da Lua no mapa"
-              src={locais.recepcao.embed}
+              title={`${mapa.nome} no mapa`}
+              src={mapa.embed}
               className="local-map"
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
@@ -28,11 +31,15 @@ export default function Local() {
           <div>
             <h3 className="local-title">Cerimônia</h3>
             <p className="local-text">{locais.cerimonia.descricao}</p>
-            <h3 className="local-title">Recepção</h3>
-            <p className="local-text">{locais.recepcao.descricao}</p>
+            {recepcao && (
+              <>
+                <h3 className="local-title">Recepção</h3>
+                <p className="local-text">{recepcao.descricao}</p>
+              </>
+            )}
             <div className="local-links">
               <MapsLink href={locais.cerimonia.maps}>Cerimônia</MapsLink>
-              <MapsLink href={locais.recepcao.maps}>Recepção</MapsLink>
+              {recepcao && <MapsLink href={recepcao.maps}>Recepção</MapsLink>}
             </div>
           </div>
         </div>

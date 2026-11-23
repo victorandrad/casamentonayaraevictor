@@ -6,3 +6,4 @@ export * from './categorias';
 export * from './galeria';
 export * from './consentimento';
 export * from './navegacao';
+export * from './convite';

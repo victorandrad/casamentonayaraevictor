@@ -6,6 +6,7 @@
   max-width: 820px;
   margin: 0 auto;
 }
+.evento-grid--um { max-width: 400px; }
 .evento-card { text-align: center; padding-top: 72px; padding-bottom: 44px; }
 .evento-card__icon {
   width: 72px;

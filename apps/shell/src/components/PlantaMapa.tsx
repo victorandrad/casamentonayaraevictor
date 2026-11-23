@@ -26,7 +26,7 @@ const SALAS: Array<{ r: [number, number, number, number]; nome: string[]; nomeVe
   { r: [0.24, 0.66, 0.36, 0.84], nome: ['Traje'] },
   { r: [0.4, 0.71, 0.6, 0.96], nome: ['Paróquia São José'], nomeVertical: ['Paróquia', 'São José'], afastado: true },
   { r: [0.64, 0.66, 0.76, 0.84], nome: ['Pista de', 'dança'] },
-  { r: [0.85, 0.68, 0.97, 0.94], nome: ['Recanto', 'Espelho', 'da Lua'] },
+  { r: [0.85, 0.68, 0.97, 0.94], nome: ['Recepção'] },
 ];
 
 // Footprint paths along the corridors; the couple meet at the altar.

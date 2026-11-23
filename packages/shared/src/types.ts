@@ -14,11 +14,15 @@ export type Resposta = {
 };
 
 // Public
+// A wedding venue as shown on the site (ceremony or reception).
+export type LocalEvento = { nome: string; horario: string; linhas: string[]; descricao: string; maps: string; embed: string };
+// `recepcao`: the reception venue, only for invites marked for the reception.
 export type ConvitePublico = {
   codigo: string;
   nome: string;
   limiteAcompanhantes: number;
   resposta: Resposta | null;
+  recepcao: LocalEvento | null;
 };
 export type RespostaInput = { status: StatusResposta; acompanhantes: number; mensagem: string };
 export type Checkin = { codigo: string; nome: string; status: StatusPresenca; acompanhantes: number };
@@ -86,10 +90,11 @@ export type ConvidadoAdmin = {
   codigo: string;
   nome: string;
   limiteAcompanhantes: number;
+  recepcao: boolean;
   criadoEm: string;
   resposta: Resposta | null;
 };
-export type ConvidadoInput = { nome: string; limiteAcompanhantes: number };
+export type ConvidadoInput = { nome: string; limiteAcompanhantes: number; recepcao: boolean };
 export type RecadoAdmin = Recado & { visivel: boolean };
 export type PresenteInput = Omit<Presente, 'id' | 'disponivel' | 'presenteados' | 'emPagamento' | 'foraDoSite'>;
 export type Configuracoes = { taxa: Taxa };

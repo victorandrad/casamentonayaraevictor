@@ -39,11 +39,12 @@ const uidParams = {
 
 const convidadoBody = {
   type: 'object',
-  required: ['nome', 'limiteAcompanhantes'],
+  required: ['nome', 'limiteAcompanhantes', 'recepcao'],
   additionalProperties: false,
   properties: {
     nome: { type: 'string', minLength: 1, maxLength: 120 },
     limiteAcompanhantes: { type: 'integer', minimum: 0, maximum: 10 },
+    recepcao: { type: 'boolean' },
   },
 } as const;
 

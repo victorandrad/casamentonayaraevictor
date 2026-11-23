@@ -156,6 +156,8 @@ Upload de JPG, PNG, WebP ou HEIC até 10 MB. A API re-codifica com `sharp` (até
 
 No painel, cada convidado tem o botão **QR Code** (PNG em alta ou impressão) e a aba Convidados tem **Imprimir QR Codes**: uma folha A4 com QR, nome e código de todos os convites filtrados.
 
+O **endereço da recepção** não fica no código do site: a API só o envia junto com convites marcados como **Convidado também para a recepção** (no cadastro do convite). Quem abre o link ou digita um desses códigos vê a recepção na página, e o código fica salvo no navegador para as próximas visitas; os demais veem só a cerimônia.
+
 ### 👥 Contas do painel
 
 - **Minha conta** (qualquer usuário): editar nome e trocar senha; os outros aparelhos conectados saem.
@@ -373,6 +375,7 @@ Em *Settings → Secrets and variables → Actions*. A cada deploy o job manda o
 - [ ] Conta do Mercado Pago conectada no painel (não "Conta de teste") e um pagamento real pequeno de teste
 - [ ] Reputação do e-mail em https://www.mail-tester.com
 - [ ] Fotos e legendas do álbum no painel
+- [ ] Marcar no painel os convites que vão à recepção (só eles veem o endereço)
 - [ ] Convites com QR Code impressos (aba Convidados → **Imprimir QR Codes**)
 - [ ] Testar a portaria (`/#scanner`) num celular, no local
 - [ ] Backup do banco e das fotos

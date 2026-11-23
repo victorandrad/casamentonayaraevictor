@@ -25,12 +25,13 @@ const byNome = (a: ConvidadoAdmin, b: ConvidadoAdmin) => a.nome.localeCompare(b.
 
 function exportarCsv(convidados: ConvidadoAdmin[]) {
   const linhas = [
-    ['Nome', 'Código', 'Link', 'Limite de acompanhantes', 'Resposta', 'Acompanhantes', 'Total de pessoas', 'Recado', 'Respondido em'],
+    ['Nome', 'Código', 'Link', 'Limite de acompanhantes', 'Recepção', 'Resposta', 'Acompanhantes', 'Total de pessoas', 'Recado', 'Respondido em'],
     ...convidados.map((c) => [
       c.nome,
       c.codigo,
       inviteLink(c.codigo),
       String(c.limiteAcompanhantes),
+      c.recepcao ? 'Sim' : 'Não',
       statusLabel[statusDe(c)],
       String(c.resposta?.acompanhantes ?? ''),
       c.resposta?.status === 'sim' ? String(1 + c.resposta.acompanhantes) : '',
@@ -70,6 +71,7 @@ function ConvidadoModal({
   const [dados, setDados] = useState<ConvidadoInput>({
     nome: convidado?.nome ?? '',
     limiteAcompanhantes: convidado?.limiteAcompanhantes ?? 0,
+    recepcao: convidado?.recepcao ?? false,
   });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
@@ -130,6 +132,13 @@ function ConvidadoModal({
           Este convidado confirmou {convidado.resposta.acompanhantes} acompanhante(s); ao salvar, a resposta será ajustada para o novo limite.
         </p>
       )}
+      <label className="painel-checkbox">
+        <input type="checkbox" checked={dados.recepcao} onChange={(e) => setDados({ ...dados, recepcao: e.target.checked })} />
+        <span>
+          Convidado também para a recepção
+          <small>Só quem tem esta opção vê o endereço da recepção no site, ao abrir o link ou digitar o código do convite.</small>
+        </span>
+      </label>
       {erro && (
         <p className="painel-alert" role="alert">
           {erro}
@@ -279,6 +288,7 @@ export function Convidados() {
                 <div className="painel-item__meta">
                   <code>{c.codigo}</code>
                   <span>{c.limiteAcompanhantes === 0 ? 'sem acompanhantes' : `até ${c.limiteAcompanhantes} acompanhante(s)`}</span>
+                  <span>{c.recepcao ? 'cerimônia e recepção' : 'só cerimônia'}</span>
                   {c.resposta?.status === 'sim' && (
                     <span className="painel-item__people">
                       {1 + c.resposta.acompanhantes} pessoa{c.resposta.acompanhantes ? 's' : ''}
