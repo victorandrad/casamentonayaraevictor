@@ -1,0 +1,34 @@
+# Página pública de status (https://status.casamentonayaraevictor.com.br), com o Gatus.
+# Roda no VPS em /opt/status, fora do compose do site: se o site cair, a página continua no ar
+# para mostrar isso. Atualizar depois de mudar config.yaml (ver README, "Página de status"):
+#
+#   scp status/compose.yaml status/config.yaml root@177.7.36.12:/opt/status/
+#   ssh root@177.7.36.12 'cd /opt/status && docker compose up -d && docker compose restart gatus'
+#
+# O Traefik do servidor roda na rede do host e chega ao Gatus pela rede deste projeto. A rede
+# "email" é só para testar a porta 25 do servidor de e-mail pelo nome interno.
+services:
+  gatus:
+    image: twinproduction/gatus:v5.38.0
+    restart: unless-stopped
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro
+      - dados:/data
+    networks:
+      - default
+      - email
+    mem_limit: 128m
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: status_default
+      traefik.http.routers.status.rule: Host(`status.casamentonayaraevictor.com.br`)
+      traefik.http.routers.status.entrypoints: websecure
+      traefik.http.routers.status.tls.certresolver: letsencrypt
+      traefik.http.services.status.loadbalancer.server.port: "8080"
+
+volumes:
+  dados:
+
+networks:
+  email:
+    external: true

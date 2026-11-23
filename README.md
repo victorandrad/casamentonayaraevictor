@@ -279,6 +279,13 @@ Produção em **https://casamentonayaraevictor.com.br**, num VPS da Hostinger at
 
 Fora do deploy, o **Monitor** ([monitor.yml](.github/workflows/monitor.yml)) confere a cada 5 minutos a home, `/api/health`, o manifest de cada microfrontend e a validade do certificado. Se algo cair, abre a issue `[monitor] Site fora do ar` (o GitHub avisa por e-mail e no app) e a fecha sozinho quando volta. O GitHub desliga workflows agendados depois de 60 dias sem commits: se o repositório ficar parado, reative em *Actions → Monitor*.
 
+A **página de status** pública, em https://status.casamentonayaraevictor.com.br, mostra para qualquer pessoa se o site, as seções, o servidor com o banco, os pagamentos e o envio de e-mails estão funcionando, com o histórico de cada item. É o [Gatus](https://github.com/TwiN/gatus), configurado em [status/config.yaml](status/config.yaml). Ele roda no VPS em `/opt/status`, separado do site, e checa tudo a cada 2 minutos. Para publicar uma mudança:
+
+```bash
+scp status/compose.yaml status/config.yaml root@177.7.36.12:/opt/status/
+ssh root@177.7.36.12 'cd /opt/status && docker compose up -d && docker compose restart gatus'
+```
+
 ```mermaid
 flowchart LR
     I[install<br/>npm ci] --> SE[security<br/>OSV-Scanner]

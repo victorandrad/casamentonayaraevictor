@@ -1,0 +1,116 @@
+# Página pública de status do site do casamento (Gatus). Cada item é checado a cada 2 minutos
+# de dentro do VPS; o histórico fica num SQLite no volume "dados".
+storage:
+  type: sqlite
+  path: /data/status.db
+  caching: true
+
+ui:
+  title: Status · Nayara & Victor
+  description: Funcionamento do site do casamento de Nayara & Victor.
+  header: Nayara & Victor
+  dashboard-heading: Status do site
+  login-subtitle: Status do site
+  dashboard-subheading: Funcionamento do site do casamento, atualizado a cada 2 minutos.
+  logo: https://casamentonayaraevictor.com.br/icon-192.png
+  link: https://casamentonayaraevictor.com.br
+  dark-mode: false
+  default-sort-by: group
+  buttons:
+    - name: Ir para o site
+      link: https://casamentonayaraevictor.com.br
+  custom-css: |
+    body { background: #f6f1ea; }
+
+# O endereço técnico de cada checagem não aparece na página: só o nome e se está funcionando.
+x-padrao: &padrao
+  interval: 2m
+  ui:
+    hide-hostname: true
+    hide-url: true
+    hide-conditions: true
+    hide-errors: true
+
+endpoints:
+  - name: Página inicial
+    group: Site
+    url: https://casamentonayaraevictor.com.br/
+    <<: *padrao
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == pat(*<title>Nayara & Victor*)"
+      - "[RESPONSE_TIME] < 5000"
+
+  - name: Certificado de segurança (HTTPS)
+    group: Site
+    url: https://casamentonayaraevictor.com.br/robots.txt
+    <<: *padrao
+    interval: 1h
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
+
+  - name: Evento e local
+    group: Seções do site
+    url: https://casamentonayaraevictor.com.br/mf/evento/mf-manifest.json
+    <<: *padrao
+    conditions: ["[STATUS] == 200"]
+
+  - name: Confirmação de presença
+    group: Seções do site
+    url: https://casamentonayaraevictor.com.br/mf/rsvp/mf-manifest.json
+    <<: *padrao
+    conditions: ["[STATUS] == 200"]
+
+  - name: Lista de presentes
+    group: Seções do site
+    url: https://casamentonayaraevictor.com.br/mf/presentes/mf-manifest.json
+    <<: *padrao
+    conditions: ["[STATUS] == 200"]
+
+  - name: Mural, galeria e fotos
+    group: Seções do site
+    url: https://casamentonayaraevictor.com.br/mf/mural/mf-manifest.json
+    <<: *padrao
+    conditions: ["[STATUS] == 200"]
+
+  - name: Painel dos noivos
+    group: Seções do site
+    url: https://casamentonayaraevictor.com.br/mf/painel/mf-manifest.json
+    <<: *padrao
+    conditions: ["[STATUS] == 200"]
+
+  # /api/health também consulta o banco: se o Postgres cair, este item cai junto.
+  - name: Servidor e banco de dados
+    group: Serviços
+    url: https://casamentonayaraevictor.com.br/api/health
+    <<: *padrao
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].ok == true"
+      - "[RESPONSE_TIME] < 3000"
+
+  - name: Lista de presentes (dados)
+    group: Serviços
+    url: https://casamentonayaraevictor.com.br/api/public/presentes
+    <<: *padrao
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 3000"
+
+  # Sem chave a API do Mercado Pago responde 401: qualquer resposta abaixo de 500 mostra que está no ar.
+  - name: Pagamentos (Mercado Pago)
+    group: Serviços
+    url: https://api.mercadopago.com/v1/payment_methods
+    <<: *padrao
+    interval: 5m
+    conditions:
+      - "[STATUS] < 500"
+
+  - name: Envio de e-mails
+    group: Serviços
+    url: tcp://mail.casamentonayaraevictor.com.br:25
+    <<: *padrao
+    interval: 5m
+    conditions:
+      - "[CONNECTED] == true"
