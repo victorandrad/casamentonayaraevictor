@@ -29,6 +29,16 @@
   color: var(--nv-rose);
   margin: 0 0 18px;
 }
+.evento-aviso {
+  max-width: 400px;
+  margin: 28px auto 0;
+  text-align: center;
+  font-family: var(--nv-serif);
+  font-style: italic;
+  font-size: 20px;
+  line-height: 1.5;
+  color: var(--nv-rose-dark);
+}
 .evento-card__address {
   display: flex;
   flex-direction: column;

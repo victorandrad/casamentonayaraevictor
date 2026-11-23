@@ -4,7 +4,10 @@ import './evento.css';
 
 export default function Evento() {
   // The reception only shows up for invites marked for it (the API sends its address with the invite).
-  const recepcao = useConvite()?.recepcao ?? null;
+  const convite = useConvite();
+  const recepcao = convite?.recepcao ?? null;
+  // Guests whose invite is for the ceremony only get a note about when to greet the couple.
+  const soCerimonia = convite != null && recepcao == null;
   const cards: Array<{ icon: IconName; titulo: string; local: LocalEvento }> = [
     { icon: 'church', titulo: 'Cerimônia', local: locais.cerimonia },
     ...(recepcao ? [{ icon: 'cheers' as const, titulo: 'Recepção', local: recepcao }] : []),
@@ -31,6 +34,9 @@ export default function Evento() {
             </div>
           ))}
         </div>
+        {soCerimonia && (
+          <p className="evento-aviso nv-reveal">Os noivos receberão os cumprimentos após a cerimônia.</p>
+        )}
       </div>
     </section>
   );
