@@ -1,59 +1,70 @@
-# Monitoramento de erros do frontend (https://erros.casamentonayaraevictor.com.br), com o GlitchTip
-# (open source, MIT; recebe os erros pelo SDK do Sentry). Roda no VPS em /opt/erros, fora do compose do
-# site, com banco próprio: se o site cair, os erros continuam guardados e visíveis.
+# Monitoramento de erros do frontend (https://erros.casamentonayaraevictor.com.br), com o Bugsink
+# (recebe os erros pelo SDK do Sentry; licença PolyForm Shield: código aberto para ler e hospedar,
+# só não pode ser revendido como concorrente). Roda no VPS em /opt/erros, fora do compose do site,
+# com banco próprio: se o site cair, os erros continuam guardados e visíveis.
 #
 #   scp erros/compose.yaml root@177.7.36.12:/opt/erros/
 #   ssh root@177.7.36.12 'cd /opt/erros && docker compose up -d'
 #
-# A chave do Django e a senha do banco ficam em /opt/erros/.env (SECRET_KEY=... e BANCO_SENHA=...),
-# criadas uma vez no servidor com `openssl rand -hex 32` e nunca versionadas. Sem Valkey (VALKEY_URL vazio): fila, cache e sessões
-# ficam no próprio Postgres, que basta para o volume de um site de casamento.
+# A chave do Django e a senha do banco ficam em /opt/erros/.env (BUGSINK_SECRET_KEY=... e
+# BUGSINK_BANCO_SENHA=...), criadas uma vez no servidor com `openssl rand` e nunca versionadas.
+# A conta dos noivos foi criada à mão, sem senha em arquivo nenhum:
 #
-# Fica na 6.2 de propósito: a 7.0 exige migrar pela 6.2.6 e mudou o modo de rodar tudo num container.
-x-ambiente: &ambiente
-  DATABASE_URL: postgres://glitchtip:${BANCO_SENHA:?defina BANCO_SENHA em /opt/erros/.env}@banco:5432/glitchtip
-  VALKEY_URL: ""
-  SECRET_KEY: ${SECRET_KEY:?defina SECRET_KEY em /opt/erros/.env}
-  GLITCHTIP_DOMAIN: https://erros.casamentonayaraevictor.com.br
-  GLITCHTIP_INSTANCE_NAME: Erros · Nayara & Victor
-  # Alertas por e-mail saem pelo servidor de e-mail compartilhado (rede "email", sem login).
-  EMAIL_URL: smtp://mail.casamentonayaraevictor.com.br:25
-  DEFAULT_FROM_EMAIL: Erros · Nayara & Victor <nao-responder@casamentonayaraevictor.com.br>
-  # Depois da primeira conta (a dos noivos), ninguém mais se cadastra.
-  ENABLE_USER_REGISTRATION: "False"
-  ENABLE_ORGANIZATION_CREATION: "False"
-  # O que este uso não precisa: só os erros do navegador.
-  GLITCHTIP_ENABLE_LOGS: "False"
-  GLITCHTIP_ENABLE_UPTIME: "False"
-  ENABLE_ADMIN: "False"
-  GLITCHTIP_MAX_EVENT_LIFE_DAYS: "90"
-  SERVER_ROLE: all_in_one
-  PORT: "8000"
-
+#   ssh -t root@177.7.36.12 'docker exec -it erros-bugsink-1 bugsink-manage createsuperuser'
 services:
   banco:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: glitchtip
-      POSTGRES_PASSWORD: ${BANCO_SENHA}
-      POSTGRES_DB: glitchtip
+      POSTGRES_USER: bugsink
+      POSTGRES_PASSWORD: ${BUGSINK_BANCO_SENHA:?defina BUGSINK_BANCO_SENHA em /opt/erros/.env}
+      POSTGRES_DB: bugsink
     volumes:
-      - banco:/var/lib/postgresql/data
+      - bugsink-banco:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U bugsink -h localhost
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     mem_limit: 256m
 
-  glitchtip:
-    image: glitchtip/glitchtip:6.2.6
+  bugsink:
+    image: bugsink/bugsink:2.6.3
     restart: unless-stopped
     depends_on:
-      - banco
-    environment: *ambiente
-    volumes:
-      - uploads:/code/uploads
+      banco:
+        condition: service_healthy
+    environment:
+      SECRET_KEY: ${BUGSINK_SECRET_KEY:?defina BUGSINK_SECRET_KEY em /opt/erros/.env}
+      DATABASE_URL: postgresql://bugsink:${BUGSINK_BANCO_SENHA}@banco:5432/bugsink
+      PORT: "8000"
+      BASE_URL: https://erros.casamentonayaraevictor.com.br
+      SITE_TITLE: Erros · Nayara & Victor
+      # Atrás do Traefik, que cuida do HTTPS. O IP real do visitante (X-Real-IP) é ignorado de propósito:
+      # o Bugsink só vê o endereço interno do Traefik e não guarda o IP de quem teve o erro.
+      BEHIND_HTTPS_PROXY: "true"
+      USE_X_REAL_IP: "false"
+      # Só a conta dos noivos: sem cadastro, times ou convites.
+      SINGLE_USER: "true"
+      # Alertas por e-mail saem pelo servidor de e-mail compartilhado (rede "email", porta 25, sem login).
+      EMAIL_HOST: mail.casamentonayaraevictor.com.br
+      EMAIL_PORT: "25"
+      EMAIL_USE_TLS: "false"
+      DEFAULT_FROM_EMAIL: Erros · Nayara & Victor <nao-responder@casamentonayaraevictor.com.br>
+      # Erros com mais de 90 dias são apagados pela limpeza do Bugsink.
+      MAX_EVENT_AGE_DAYS: "90"
+      # Não manda estatísticas de uso para o Bugsink.
+      PHONEHOME: "false"
     networks:
       - default
       - email
     mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import requests; requests.get(\"http://localhost:8000/health/ready\").raise_for_status()'"]
+      interval: 10s
+      timeout: 20s
+      retries: 10
     labels:
       traefik.enable: "true"
       traefik.docker.network: erros_default
@@ -63,8 +74,7 @@ services:
       traefik.http.services.erros.loadbalancer.server.port: "8000"
 
 volumes:
-  banco:
-  uploads:
+  bugsink-banco:
 
 networks:
   email:

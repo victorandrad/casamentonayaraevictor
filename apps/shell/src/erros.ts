@@ -1,11 +1,11 @@
 // Front-end error monitoring: errors from the shell and every micro-frontend (they all run on this
-// page) go to our own GlitchTip at erros.casamentonayaraevictor.com.br, which speaks the Sentry
+// page) go to our own Bugsink at erros.casamentonayaraevictor.com.br, which speaks the Sentry
 // protocol. Only on the real site, so local development never reports.
 //
 // The SDK is loaded in its own chunk after the page starts, so it never delays the first paint; errors
 // reported before it arrives wait in a short queue. The DSN is public by design: it only lets the
 // browser send errors to that one project.
-const DSN = 'https://c0c61793e99e486b9c20b2dc0a8cf001@erros.casamentonayaraevictor.com.br/1';
+const DSN = 'https://486bab3048cc4d939dec14b542e61d7d@erros.casamentonayaraevictor.com.br/1';
 const SITE = 'casamentonayaraevictor.com.br';
 
 // Invite codes (NV-XXXX) open the guest's invite, the reception address and the check-in: they never
@@ -45,6 +45,8 @@ function iniciar(Sentry: Sentry) {
       return crumb;
     },
     beforeSend(event) {
+      // No user at all, so the server can't fill in the visitor's IP either.
+      delete event.user;
       if (event.request?.url) event.request.url = limparUrl(event.request.url);
       if (event.request) {
         delete event.request.query_string;
