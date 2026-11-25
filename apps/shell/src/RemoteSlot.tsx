@@ -1,4 +1,5 @@
 import { Component, Suspense, type ComponentType, type LazyExoticComponent, type ReactNode } from 'react';
+import { reportarErro } from './erros';
 
 class RemoteErrorBoundary extends Component<{ name: string; children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -9,6 +10,7 @@ class RemoteErrorBoundary extends Component<{ name: string; children: ReactNode 
 
   componentDidCatch(error: unknown) {
     console.error(`[shell] remote "${this.props.name}" failed to load`, error);
+    reportarErro(error, { secao: this.props.name });
   }
 
   render() {

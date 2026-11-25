@@ -76,7 +76,9 @@ export function AvisoCookies() {
               <p className="shell-cookies__descricao">
                 O carrinho de presentes (guardado por até 24 horas), o pedido ou Pix em andamento, a abertura do mapa já
                 vista, o login do painel dos noivos e, se você enviar fotos, seu nome e o que enviou (para poder excluir). Ficam só no seu navegador, sem rastreamento nem anúncios. Se você
-                pedir avisos de um pagamento, o navegador os recebe só até o pedido terminar.
+                pedir avisos de um pagamento, o navegador os recebe só até o pedido terminar. Se algo der errado no site,
+                um relatório técnico do erro (sem seu nome, código do convite ou cookies) vai para um servidor nosso, para
+                podermos corrigir.
               </p>
             </div>
             <Interruptor id="cookies-essenciais" ligado bloqueado />

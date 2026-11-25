@@ -286,6 +286,13 @@ scp status/compose.yaml status/config.yaml root@177.7.36.12:/opt/status/
 ssh root@177.7.36.12 'cd /opt/status && docker compose up -d && docker compose restart gatus'
 ```
 
+Os **erros do frontend** vão para https://erros.casamentonayaraevictor.com.br, um [GlitchTip](https://glitchtip.com) próprio (open source, usa o SDK do Sentry). Qualquer erro no navegador dos convidados, no shell ou em qualquer microfrontend, aparece lá com a seção onde aconteceu (tag `secao`, como `rsvp/Rsvp`). O envio está em [apps/shell/src/erros.ts](apps/shell/src/erros.ts) e só liga no domínio real. Não vão nome, cookies, cabeçalhos nem corpos de requisição; códigos de convite viram `NV-****` e a parte da URL depois de `#` ou `?` é cortada. O GlitchTip roda no VPS em `/opt/erros`, com banco próprio e erros guardados por 90 dias. A chave e a senha do banco ficam só no servidor, em `/opt/erros/.env`. O cadastro está fechado: a conta dos noivos foi a primeira. Para atualizar:
+
+```bash
+scp erros/compose.yaml root@177.7.36.12:/opt/erros/
+ssh root@177.7.36.12 'cd /opt/erros && docker compose up -d'
+```
+
 ```mermaid
 flowchart LR
     I[install<br/>npm ci] --> SE[security<br/>OSV-Scanner]
